@@ -132,17 +132,41 @@ export function drawRig(ctx, rig, s) {
     const boxH = s.h * (rig.fyll ?? 1);
     const boxW = boxH * ratio;
     const parts = rig.deler.slice().sort((a, b) => (a.z || 0) - (b.z || 0));
-    ctx.save();
-    ctx.translate(s.x, s.y);
-    ctx.scale((s.facing >= 0 ? 1 : -1), 1);
-    for (const p of parts) {
-      const path = partPath(rig, base, p.navn, s.variants);
-      const img = path && tex(path);
-      if (!img) continue;
-      drawPart(ctx, img, p, s, boxW, boxH);
+
+    const paint = (c) => {
+      for (const p of parts) {
+        const path = partPath(rig, base, p.navn, s.variants);
+        const img = path && tex(path);
+        if (!img) continue;
+        drawPart(c, img, p, s, boxW, boxH);
+      }
+    };
+
+    if (s.flash) {
+      // Blink: tegn figuren paa et eget lerret og farg BARE pikslene som
+      // faktisk ble tegnet. (Foer ble det en stygg hvit firkant rundt.)
+      const pad = boxH * 0.4;
+      const sw = boxW + pad * 2, sh = boxH + pad * 2;
+      const sc = scratch(sw, sh);
+      sc.clearRect(0, 0, sw, sh);
+      sc.save();
+      sc.translate(pad + boxW / 2, pad + boxH);
+      sc.scale((s.facing >= 0 ? 1 : -1), 1);
+      paint(sc);
+      sc.globalCompositeOperation = 'source-atop';
+      sc.fillStyle = 'rgba(255,255,255,0.8)';
+      sc.fillRect(-sw, -sh, sw * 2, sh * 2);
+      sc.restore();
+      sc.globalCompositeOperation = 'source-over';
+      ctx.drawImage(scratchCanvas, 0, 0, sw, sh,
+        s.x - pad - boxW / 2, s.y - pad - boxH, sw, sh);
+    } else {
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.scale((s.facing >= 0 ? 1 : -1), 1);
+      paint(ctx);
+      ctx.restore();
     }
-    ctx.restore();
-    if (s.flash) flashOver(ctx, s);
     return true;
   }
   if (bodyPath && pending(bodyPath)) return false; // vent - kanskje den kommer
@@ -159,9 +183,19 @@ export function drawRig(ctx, rig, s) {
     ctx.save();
     ctx.translate(s.x, s.y);
     ctx.scale((s.facing >= 0 ? 1 : -1) * (2 - sq), sq);
-    ctx.drawImage(one, -boxW / 2, -boxH, boxW, boxH);
+    if (s.flash) {
+      const sc = scratch(boxW, boxH);
+      sc.clearRect(0, 0, boxW, boxH);
+      sc.drawImage(one, 0, 0, boxW, boxH);
+      sc.globalCompositeOperation = 'source-atop';
+      sc.fillStyle = 'rgba(255,255,255,0.8)';
+      sc.fillRect(0, 0, boxW, boxH);
+      sc.globalCompositeOperation = 'source-over';
+      ctx.drawImage(scratchCanvas, 0, 0, boxW, boxH, -boxW / 2, -boxH, boxW, boxH);
+    } else {
+      ctx.drawImage(one, -boxW / 2, -boxH, boxW, boxH);
+    }
     ctx.restore();
-    if (s.flash) flashOver(ctx, s);
     return true;
   }
 
@@ -185,14 +219,18 @@ function drawPart(ctx, img, p, s, boxW, boxH) {
   ctx.restore();
 }
 
-/** Hvitt blink naar figuren blir truffet. */
-function flashOver(ctx, s) {
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.globalAlpha = 0.45;
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(s.x - s.h * 0.5, s.y - s.h, s.h, s.h);
-  ctx.restore();
+// Ekstra lerret brukt til blinket, slik at bare selve figuren lyser opp.
+let scratchCanvas = null, scratchCtx = null;
+function scratch(w, h) {
+  if (!scratchCanvas) {
+    scratchCanvas = document.createElement('canvas');
+    scratchCtx = scratchCanvas.getContext('2d');
+  }
+  if (scratchCanvas.width < w || scratchCanvas.height < h) {
+    scratchCanvas.width = Math.ceil(w);
+    scratchCanvas.height = Math.ceil(h);
+  }
+  return scratchCtx;
 }
 
 /**

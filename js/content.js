@@ -86,7 +86,7 @@ export const ENEMIES = {
 //  SJEFER - kjempestore, en paa slutten av hvert nivaa
 // ============================================================
 export const BOSSES = {
-  godzaur:     { hp: 55,  w: 200, h: 180, sp: 62,  body: '#4f8f5a', dark: '#23512d', face: '\u{1F996}', pattern: 'slam',         coins: 65 },
+  godzaur:     { hp: 40,  w: 200, h: 180, sp: 56,  body: '#4f8f5a', dark: '#23512d', face: '\u{1F996}', pattern: 'slam',         coins: 65 },
   roddrage:    { hp: 130, w: 250, h: 150, sp: 125, body: '#e04b3a', dark: '#8c1c14', face: '\u{1F409}', fly: true, pattern: 'dive-bomb', coins: 100 },
   hydra:       { hp: 200, w: 220, h: 190, sp: 80,  body: '#3fb98a', dark: '#1a6b4d', face: '\u{1F40D}', pattern: 'spread',       coins: 145 },
   frostdragen: { hp: 300, w: 225, h: 200, sp: 98,  body: '#7fd8f0', dark: '#256f8a', face: '❄️', fly: true, pattern: 'teleport-orb', coins: 200 },

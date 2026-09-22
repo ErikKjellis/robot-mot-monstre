@@ -619,6 +619,20 @@ export function drawBullet(ctx, b) {
   }
 }
 
+/** Mykt lysglimt rundt et monster som nettopp ble truffet. */
+export function drawHitHalo(ctx, cx, cy, r, a) {
+  const g = ctx.createRadialGradient(cx, cy, r * 0.35, cx, cy, r);
+  g.addColorStop(0, 'rgba(255,246,192,' + (0.55 * a).toFixed(3) + ')');
+  g.addColorStop(0.6, 'rgba(255,214,120,' + (0.22 * a).toFixed(3) + ')');
+  g.addColorStop(1, 'rgba(255,214,120,0)');
+  ctx.save();
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+}
+
 /** Laserstraalen fra robotens oeyne. */
 export function drawLaser(ctx, l) {
   const a = clamp(l.life / l.max, 0, 1);

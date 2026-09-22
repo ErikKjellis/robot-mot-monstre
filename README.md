@@ -35,13 +35,16 @@ node serve.js
 
 | Nettbrett | Tastatur (til testing) |
 |---|---|
-| ◀ ▶ store knapper nede til venstre | piltaster / A og D |
-| ⬆ grønn knapp nede til høyre | mellomrom / pil opp / W |
-| 💥 rød knapp nede til høyre | J, K, Z eller Shift |
+| **Styrespak** — legg tommelen hvor som helst i venstre halvdel, så dukker spaken opp der. Dra sidelengs for å gå. | piltaster / A og D |
+| ⬆ grønn knapp nederst til høyre | mellomrom / pil opp / W |
+| 💥 rød knapp litt over og til venstre for hoppeknappen | J, K, Z eller Shift |
 
-Hold 💥 inne for å skyte i ett sett. Du kan hoppe **oppå** små monstre for å
-knuse dem. Laseren og hammeren går av seg selv når du har kjøpt dem — ingen
-ekstra knapper å huske.
+Styrespaken er analog — dytter du den litt, går roboten sakte.
+
+**Roboten skyter av seg selv** på monstre den har rett foran seg, så man slipper
+å holde skyteknappen og hoppeknappen samtidig med samme tommel. Trykker du 💥
+selv, skyter den litt raskere. Laseren og hammeren går også av seg selv når du
+har kjøpt dem. Du kan dessuten hoppe **oppå** små monstre for å knuse dem.
 
 ---
 

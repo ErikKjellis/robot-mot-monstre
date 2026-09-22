@@ -191,16 +191,23 @@ export const sound = new Sound();
 // ============================================================
 
 export const input = {
-  left: false,
-  right: false,
+  stickX: 0,     // -1..1 fra styrespaken
+  keyX: 0,       // -1..1 fra tastaturet
   shoot: false,
   jumpHeld: false,
   jumpBuffer: 0, // liten "husk trykket"-tid, gjoer hoppingen snill
 };
 
+/** Hvor mye roboten skal gaa: styrespaken vinner over tastaturet. */
+export function moveAxis() {
+  return input.stickX !== 0 ? input.stickX : input.keyX;
+}
+
+let keyL = false, keyR = false;
+
 function press(act, down) {
-  if (act === 'left') input.left = down;
-  else if (act === 'right') input.right = down;
+  if (act === 'left') { keyL = down; input.keyX = (keyR ? 1 : 0) - (keyL ? 1 : 0); }
+  else if (act === 'right') { keyR = down; input.keyX = (keyR ? 1 : 0) - (keyL ? 1 : 0); }
   else if (act === 'shoot') input.shoot = down;
   else if (act === 'jump') {
     input.jumpHeld = down;
@@ -209,8 +216,71 @@ function press(act, down) {
 }
 
 export function clearInput() {
-  input.left = input.right = input.shoot = input.jumpHeld = false;
+  keyL = keyR = false;
+  input.stickX = input.keyX = 0;
+  input.shoot = input.jumpHeld = false;
   input.jumpBuffer = 0;
+  if (releaseStick) releaseStick();
+}
+
+let releaseStick = null;
+
+/**
+ * Flytende styrespak: legg tommelen hvor som helst i venstre halvdel, saa
+ * dukker spaken opp akkurat der. Dra sidelengs for aa gaa.
+ */
+export function setupStick(zone, stick, knob) {
+  let id = null, cx = 0, cy = 0;
+  const DEAD = 0.18;
+
+  const radius = () => Math.max(46, stick.offsetWidth / 2);
+
+  function apply(e) {
+    const dx = e.clientX - cx, dy = e.clientY - cy;
+    const R = radius();
+    const d = Math.hypot(dx, dy);
+    const k = d > 0 ? Math.min(1, d / R) : 0;
+    const nx = d > 0 ? (dx / d) * k : 0;
+    // Litt "snill" kurve: full fart allerede naar tommelen er halvveis ute.
+    let v = 0;
+    if (Math.abs(nx) > DEAD) {
+      v = Math.sign(nx) * Math.min(1, ((Math.abs(nx) - DEAD) / (1 - DEAD)) * 1.7);
+    }
+    input.stickX = v;
+    const kx = d > 0 ? (dx / d) * k * R : 0;
+    const ky = d > 0 ? (dy / d) * k * R : 0;
+    knob.style.transform = 'translate(calc(-50% + ' + kx.toFixed(1) + 'px), calc(-50% + ' + ky.toFixed(1) + 'px))';
+  }
+
+  function release() {
+    id = null;
+    input.stickX = 0;
+    stick.classList.remove('on');
+    stick.style.left = stick.style.top = stick.style.bottom = stick.style.transform = '';
+    knob.style.transform = 'translate(-50%, -50%)';
+  }
+  releaseStick = release;
+
+  zone.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    sound.unlock();
+    if (id !== null) return;
+    id = e.pointerId;
+    try { zone.setPointerCapture(id); } catch (err) { /* ignorer */ }
+    cx = e.clientX; cy = e.clientY;
+    stick.classList.add('on');
+    stick.style.left = cx + 'px';
+    stick.style.top = cy + 'px';
+    stick.style.bottom = 'auto';
+    stick.style.transform = 'translate(-50%, -50%)';
+    apply(e);
+  });
+  zone.addEventListener('pointermove', (e) => { if (e.pointerId === id) { e.preventDefault(); apply(e); } });
+  const up = (e) => { if (e.pointerId === id) { e.preventDefault(); release(); } };
+  zone.addEventListener('pointerup', up);
+  zone.addEventListener('pointercancel', up);
+  zone.addEventListener('lostpointercapture', up);
+  zone.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 
 export function setupInput(root) {

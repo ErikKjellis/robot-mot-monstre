@@ -1,6 +1,6 @@
 // main.js - limet: starter spillet og bytter mellom skjermbildene.
 
-import { sound, setupInput, clearInput, store, pick } from './core.js';
+import { sound, setupInput, setupStick, clearInput, store, pick } from './core.js';
 import { LEVELS } from './content.js';
 import { Game, preloadFigures } from './game.js';
 import {
@@ -145,6 +145,7 @@ window.addEventListener('pointerdown', () => sound.unlock(), { once: true });
 //  OPPSETT
 // ---------------------------------------------------------------
 setupInput(document);
+setupStick(el('stickZone'), el('stick'), el('stickKnob'));
 setSoundIcons();
 preloadFigures();   // ser etter egne PNG-figurer i art/-mappa
 

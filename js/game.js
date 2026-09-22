@@ -1,6 +1,6 @@
 // game.js - selve spillet: roboten, monstrene, sjefene og banen.
 
-import { clamp, rand, randInt, chance, mulberry32, overlap, sound, input, TAU } from './core.js';
+import { clamp, rand, randInt, chance, mulberry32, overlap, sound, input, moveAxis, TAU } from './core.js';
 import { LEVELS, THEMES, ENEMIES, BOSSES, stats, emptyUpgrades, levelScale } from './content.js';
 import { ROBOT_RIG, rigFor, MONSTER_RIGS } from './rigs.js';
 import * as sprites from './sprites.js';
@@ -105,14 +105,28 @@ export class Game {
     const bossAt = len - ARENA_MIN;
     const sc = levelScale(i);
 
+    // Plattformene legges innenfor det roboten FAKTISK klarer aa hoppe.
+    // Den oeverste naar du ved aa hoppe videre fra den nederste.
+    const apex = (this.st.jump * this.st.jump) / (2 * GRAV);
+    const rise = Math.min(apex * 0.72, 125);
     const platforms = [];
     const n = Math.floor((bossAt - 900) / 520);
     for (let k = 0; k < n; k++) {
-      platforms.push({
-        x: 800 + k * 520 + rng() * 180,
-        y: GROUND_Y - (110 + rng() * 130),
-        w: 130 + rng() * 110, h: 26,
-      });
+      const x = 800 + k * 520 + rng() * 150;
+      const w = 130 + rng() * 110;
+      const p1 = { x, y: GROUND_Y - rise * (0.72 + rng() * 0.28), w, h: 26 };
+      platforms.push(p1);
+      if (rng() < 0.5) {
+        const w2 = 110 + rng() * 80;
+        const gap = 40 + rng() * 50;                 // lite nok til aa hoppe over
+        const right = rng() < 0.5;
+        const x2 = right ? x + w + gap : x - gap - w2;
+        platforms.push({
+          x: clamp(x2, 700, bossAt - 300),
+          y: p1.y - rise * (0.72 + rng() * 0.2),
+          w: w2, h: 26,
+        });
+      }
     }
 
     const pending = [];
@@ -207,10 +221,8 @@ export class Game {
       return;
     }
 
-    let move = 0;
-    if (input.left) move -= 1;
-    if (input.right) move += 1;
-    if (move !== 0) p.facing = move;
+    const move = moveAxis();               // -1..1 fra styrespak eller tastatur
+    if (Math.abs(move) > 0.2) p.facing = move > 0 ? 1 : -1;
 
     const target = move * st.speed;
     const accel = p.onGround ? 2600 : 1500;
@@ -251,10 +263,16 @@ export class Game {
     if (p.onGround && Math.abs(p.vx) > 30) p.walk += dt * Math.abs(p.vx) * 0.045;
 
     // --- KANON ---
+    // Roboten skyter av seg selv paa det som kommer imot, saa man ikke trenger
+    // aa holde skyteknappen og hoppeknappen samtidig med samme tommel.
+    // Trykker du selv, skyter den litt raskere.
     p.cool -= dt;
     p.flashShot = Math.max(0, p.flashShot - dt * 7);
-    if (input.shoot && p.cool <= 0) {
-      p.cool = st.cool;
+    let firing = input.shoot;
+    let coolMul = 1;
+    if (!firing && this.enemyAhead(540)) { firing = true; coolMul = 1.3; }
+    if (firing && p.cool <= 0) {
+      p.cool = st.cool * coolMul;
       p.flashShot = 1;
       const bx = p.x + p.w / 2 + p.facing * (p.h * 0.42);
       const by = p.y + p.h * 0.42;
@@ -283,6 +301,20 @@ export class Game {
       if (p.shieldT <= 0) { p.shieldUp = true; this.ring(p.x + p.w / 2, p.y + p.h / 2, 40, '#7fe8ff'); }
     }
     if (p.inv > 0) p.inv -= dt;
+  }
+
+  /** Er det et monster rett foran roboten? Brukt til automatisk skyting. */
+  enemyAhead(range) {
+    const p = this.player;
+    const cx = p.x + p.w / 2, cy = p.y + p.h * 0.5;
+    for (const e of this.world.enemies) {
+      const dx = (e.x + e.w / 2) - cx;
+      if (Math.sign(dx) !== p.facing && Math.abs(dx) > e.w * 0.5) continue;
+      if (Math.abs(dx) > range) continue;
+      if (Math.abs((e.y + e.h / 2) - cy) > e.h * 0.5 + p.h * 0.7) continue;
+      return true;
+    }
+    return false;
   }
 
   fireLaser() {
@@ -515,7 +547,7 @@ export class Game {
     const d = e.def;
     const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
     const dist = Math.abs(pcx - ecx);
-    const rage = e.hp / e.maxHp < 0.4 ? 0.65 : 1;
+    const rage = e.hp / e.maxHp < 0.4 ? 0.78 : 1;
 
     switch (e.pattern) {
       case 'jump-spawn': {
@@ -571,7 +603,7 @@ export class Game {
       }
       case 'slam': {
         e.vx = dist > 190 ? dir * d.sp : 0;
-        if (e.onGround && e.timer <= 0) { e.timer = 3.0 * rage; e.vy = -520; e.state = 1; }
+        if (e.onGround && e.timer <= 0) { e.timer = 3.6 * rage; e.vy = -520; e.state = 1; }
         if (e.state === 1 && e.onGround && e.vy === 0) {
           e.state = 0;
           this.shake(0.35, 14);
@@ -632,9 +664,10 @@ export class Game {
 
   shock(x) {
     const w = this.world;
+    // Rolig nok til at en 6-aaring rekker aa se den komme og hoppe over.
     for (const s of [-1, 1]) {
       w.bullets.push({
-        x: x + s * 40, y: GROUND_Y - 18, vx: s * 320, vy: 0, r: 16,
+        x: x + s * 40, y: GROUND_Y - 18, vx: s * 250, vy: 0, r: 16,
         friendly: false, life: 3, color: '#ff9a3d',
       });
     }
@@ -884,6 +917,10 @@ export class Game {
 
   /** Proever egne PNG-figurer foerst, faller tilbake paa innebygd tegning. */
   drawEnemy(ctx, e) {
+    if (e.hurtT > 0) {
+      art.drawHitHalo(ctx, e.x + e.w / 2, e.y + e.h / 2,
+        Math.max(e.w, e.h) * 0.85, Math.min(1, e.hurtT / 0.16));
+    }
     const rig = rigFor(e.key);
     const ok = rig && sprites.drawRig(ctx, rig, {
       x: e.x + e.w / 2, y: e.y + e.h, h: e.h,
