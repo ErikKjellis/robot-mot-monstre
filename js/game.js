@@ -1,7 +1,7 @@
 // game.js - selve spillet: roboten, monstrene, sjefene og banen.
 
 import { clamp, rand, randInt, chance, mulberry32, overlap, sound, input, moveAxis, TAU } from './core.js';
-import { LEVELS, THEMES, ENEMIES, BOSSES, stats, emptyUpgrades, levelScale } from './content.js';
+import { LEVELS, THEMES, ENEMIES, BOSSES, POWERUPS, stats, emptyUpgrades, levelScale } from './content.js';
 import { ROBOT_RIG, rigFor, MONSTER_RIGS } from './rigs.js';
 import * as sprites from './sprites.js';
 import * as art from './art.js';
@@ -110,22 +110,28 @@ export class Game {
     const apex = (this.st.jump * this.st.jump) / (2 * GRAV);
     const rise = Math.min(apex * 0.72, 125);
     const platforms = [];
+    const pickups = [];
     const n = Math.floor((bossAt - 900) / 520);
     for (let k = 0; k < n; k++) {
       const x = 800 + k * 520 + rng() * 150;
       const w = 130 + rng() * 110;
       const p1 = { x, y: GROUND_Y - rise * (0.72 + rng() * 0.28), w, h: 26 };
       platforms.push(p1);
-      if (rng() < 0.5) {
+      if (rng() < 0.62) {
         const w2 = 110 + rng() * 80;
         const gap = 40 + rng() * 50;                 // lite nok til aa hoppe over
         const right = rng() < 0.5;
         const x2 = right ? x + w + gap : x - gap - w2;
-        platforms.push({
+        const p2 = {
           x: clamp(x2, 700, bossAt - 300),
           y: p1.y - rise * (0.72 + rng() * 0.2),
           w: w2, h: 26,
-        });
+        };
+        platforms.push(p2);
+        // Kraftpakke oeverst - noe aa klatre etter.
+        const r = rng();
+        const kind = r < 0.4 ? 'rate' : r < 0.75 ? 'star' : 'heal';
+        pickups.push(this.mkPickup(p2.x + p2.w / 2, p2.y - 32, kind, true));
       }
     }
 
@@ -147,8 +153,8 @@ export class Game {
 
     this.world = {
       i, L, th, len, bossAt, sc,
-      platforms, pending, coins,
-      enemies: [], bullets: [], parts: [], texts: [], pickups: [], lasers: [], smashes: [],
+      platforms, pending, coins, pickups,
+      enemies: [], bullets: [], parts: [], texts: [], lasers: [], smashes: [],
       camX: 0, wallX: 0, locked: false, boss: null,
       cleared: false, clearT: 0, gateOpen: false,
       coinsAtStart: this.run.coins,
@@ -161,6 +167,7 @@ export class Game {
       coyote: 0, cool: 0, inv: 0, walk: 0, flashShot: 0,
       shieldUp: this.st.hasShield, shieldT: 0, dying: 0,
       jumpsLeft: 0, laserCool: 1.2, smashCool: 0.6, smashT: 0,
+      boostRate: 0, boostStar: 0,
     };
     this.shakeT = 0;
   }
@@ -169,6 +176,14 @@ export class Game {
 
   mkCoin(x, y, val) {
     return { x, y, vx: 0, vy: 0, r: 11, seed: Math.random() * 10, val: val || 1, rest: false };
+  }
+
+  /** anchored = staar stille paa en plattform. Ellers faller den til bakken. */
+  mkPickup(x, y, kind, anchored) {
+    return {
+      x, y, vx: 0, vy: 0, r: 17, kind: kind || 'heal',
+      seed: Math.random() * 10, life: anchored ? 1e9 : 16, anchored: !!anchored,
+    };
   }
 
   // ---------------------------------------------------------------
@@ -268,9 +283,12 @@ export class Game {
     // Trykker du selv, skyter den litt raskere.
     p.cool -= dt;
     p.flashShot = Math.max(0, p.flashShot - dt * 7);
+    p.boostRate = Math.max(0, p.boostRate - dt);
+    p.boostStar = Math.max(0, p.boostStar - dt);
+
     let firing = input.shoot;
-    let coolMul = 1;
-    if (!firing && this.enemyAhead(540)) { firing = true; coolMul = 1.3; }
+    let coolMul = p.boostRate > 0 ? 0.5 : 1;     // ⚡ dobbel skuddfart
+    if (!firing && this.enemyAhead(540)) { firing = true; coolMul *= 1.3; }
     if (firing && p.cool <= 0) {
       p.cool = st.cool * coolMul;
       p.flashShot = 1;
@@ -383,7 +401,7 @@ export class Game {
 
   damagePlayer(n, fromX) {
     const p = this.player;
-    if (p.inv > 0 || p.dying > 0) return;
+    if (p.inv > 0 || p.dying > 0 || p.boostStar > 0) return;   // ⭐ usaarbar
     if (p.shieldUp) {
       p.shieldUp = false;
       p.shieldT = this.st.shieldCool;
@@ -393,12 +411,16 @@ export class Game {
       return;
     }
     this.run.hp -= n;
-    p.inv = 1.4;
+    p.inv = 0.95;
     p.vx = (p.x + p.w / 2 < fromX ? -1 : 1) * 280;
     p.vy = -330;
     this.shake(0.25, 9);
     sound.hurt();
     this.puff(p.x + p.w / 2, p.y + p.h / 2, 10, '#ff8a8a');
+    this.world.texts.push({
+      x: p.x + p.w / 2, y: p.y - 6, vy: -55, life: 0.7, max: 0.7,
+      text: '-' + Math.round(n), color: '#ff8a8a', size: 22,
+    });
     if (this.run.hp <= 0) {
       this.run.hp = 0;
       p.dying = 1.3;
@@ -523,20 +545,20 @@ export class Game {
       // drager spytter ild
       if (d.shotEvery && e.timer <= 0 && dist < 520) {
         e.timer = d.shotEvery;
-        this.enemyShot(ecx, ecy, pcx, pcy, d.shotSpeed, d.shotColor);
+        this.enemyShot(ecx, ecy, pcx, pcy, d.shotSpeed, d.shotColor, d.skudd);
       }
     } else if (d.ai === 'shoot') {
       const want = 320;
       e.vx = dist > want + 60 ? dir * d.sp : dist < want - 60 ? -dir * d.sp : e.vx * 0.9;
       if (e.timer <= 0 && dist < 620) {
         e.timer = d.shotEvery;
-        this.enemyShot(ecx, ecy - e.h * 0.2, pcx, pcy, d.shotSpeed, d.shotColor);
+        this.enemyShot(ecx, ecy - e.h * 0.2, pcx, pcy, d.shotSpeed, d.shotColor, d.skudd);
       }
     } else if (d.ai === 'cast') {
       e.vx = dist > 420 ? dir * d.sp : dist < 260 ? -dir * d.sp * 0.7 : 0;
       if (e.timer <= 0 && dist < 700) {
         e.timer = d.shotEvery;
-        const b = this.enemyShot(ecx, ecy - e.h * 0.3, pcx, pcy, d.shotSpeed, d.shotColor);
+        const b = this.enemyShot(ecx, ecy - e.h * 0.3, pcx, pcy, d.shotSpeed, d.shotColor, d.skudd);
         b.homing = 2.2;
         b.r = 13;
       }
@@ -570,7 +592,7 @@ export class Game {
         if (e.timer <= 0) {
           e.timer = 2.3 * rage;
           for (let k = -2; k <= 2; k++) {
-            const b = this.enemyShot(ecx, ecy - e.h * 0.2, pcx, pcy, 280, '#8ef0c0');
+            const b = this.enemyShot(ecx, ecy - e.h * 0.2, pcx, pcy, 280, '#8ef0c0', d.skudd);
             const a = Math.atan2(b.vy, b.vx) + k * 0.2;
             const sp = Math.hypot(b.vx, b.vy);
             b.vx = Math.cos(a) * sp; b.vy = Math.sin(a) * sp;
@@ -587,7 +609,7 @@ export class Game {
           if (e.timer <= 0) {
             e.timer = 2.4 * rage;
             if (chance(0.5)) { e.state = 1; e.vy = 660; }
-            else this.enemyShot(ecx, ecy + e.h * 0.3, pcx, GROUND_Y, 320, '#ff9a3d');
+            else this.enemyShot(ecx, ecy + e.h * 0.3, pcx, GROUND_Y, 320, '#ff9a3d', d.skudd);
           }
         } else {
           e.vx *= 0.96;
@@ -596,7 +618,7 @@ export class Game {
             e.state = 0;
             e.vy = -420;
             this.shake(0.3, 12);
-            this.shock(ecx);
+            this.shock(ecx, e);
           }
         }
         break;
@@ -607,7 +629,7 @@ export class Game {
         if (e.state === 1 && e.onGround && e.vy === 0) {
           e.state = 0;
           this.shake(0.35, 14);
-          this.shock(ecx);
+          this.shock(ecx, e);
           sound.boss();
         }
         break;
@@ -619,7 +641,7 @@ export class Game {
           e.timer = 2.6 * rage;
           if (e.state === 0) {
             for (let k = 0; k < 3; k++) {
-              const b = this.enemyShot(ecx, ecy - 20 + k * 22, pcx, pcy, 180, '#bdf0ff');
+              const b = this.enemyShot(ecx, ecy - 20 + k * 22, pcx, pcy, 180, '#bdf0ff', d.skudd);
               b.homing = 2.6; b.r = 14;
             }
             e.state = 1;
@@ -642,7 +664,7 @@ export class Game {
           e.phase = (e.phase + 1) % 3;
           if (e.phase === 0) {
             for (let k = -3; k <= 3; k++) {
-              const b = this.enemyShot(ecx, ecy, pcx, pcy, 320, '#ff6b6b');
+              const b = this.enemyShot(ecx, ecy, pcx, pcy, 320, '#ff6b6b', d.skudd);
               const a = Math.atan2(b.vy, b.vx) + k * 0.17;
               const sp = Math.hypot(b.vx, b.vy);
               b.vx = Math.cos(a) * sp; b.vy = Math.sin(a) * sp;
@@ -655,28 +677,40 @@ export class Game {
           }
         }
         if (e.state === 1 && e.onGround && e.vy === 0) {
-          e.state = 0; this.shake(0.35, 14); this.shock(ecx); sound.boss();
+          e.state = 0; this.shake(0.35, 14); this.shock(ecx, e); sound.boss();
         }
         break;
       }
     }
   }
 
-  shock(x) {
+  /**
+   * Sjokkboelge langs bakken. Den blinker paa bakken en liten stund foer den
+   * begynner aa rulle, slik at man rekker aa se den komme og hoppe over.
+   */
+  shock(x, e) {
+    const d = (e && e.def) || {};
     const w = this.world;
-    // Rolig nok til at en 6-aaring rekker aa se den komme og hoppe over.
-    for (const s of [-1, 1]) {
+    const sp = d.shockSpeed ?? 250;
+    const dmg = d.shockDmg ?? 15;
+    const warn = d.shockWarn ?? 0.35;
+    const pcx = this.player.x + this.player.w / 2;
+    const dirs = (d.shockCount ?? 2) === 1 ? [Math.sign(pcx - x) || 1] : [-1, 1];
+    for (const s of dirs) {
       w.bullets.push({
-        x: x + s * 40, y: GROUND_Y - 18, vx: s * 250, vy: 0, r: 16,
-        friendly: false, life: 3, color: '#ff9a3d',
+        x: x + s * 40, y: GROUND_Y - 20, vx: s * sp, vy: 0, r: 19,
+        friendly: false, life: 4, color: '#ff9a3d', dmg, warn, shock: true,
       });
     }
     this.ring(x, GROUND_Y - 10, 60, '#ff9a3d');
   }
 
-  enemyShot(x, y, tx, ty, sp, color) {
+  enemyShot(x, y, tx, ty, sp, color, dmg) {
     const a = Math.atan2(ty - y, tx - x);
-    const b = { x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 10, friendly: false, life: 5, color };
+    const b = {
+      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      r: 10, friendly: false, life: 5, color, dmg: dmg || 12,
+    };
     this.world.bullets.push(b);
     return b;
   }
@@ -704,11 +738,16 @@ export class Game {
       c.vy = rand(-380, -160);
       w.coins.push(c);
     }
-    if (!e.boss && chance(0.09) && this.run.hp < this.st.maxHp) {
-      w.pickups.push({ x: cx, y: cy, vx: rand(-60, 60), vy: -260, r: 16, life: 16 });
+    if (!e.boss && chance(0.12) && this.run.hp < this.st.maxHp) {
+      const h = this.mkPickup(cx, cy, 'heal', false);
+      h.vx = rand(-60, 60); h.vy = -260;
+      w.pickups.push(h);
     } else if (e.boss) {
-      w.pickups.push({ x: cx, y: cy, vx: -40, vy: -280, r: 16, life: 99 });
-      w.pickups.push({ x: cx, y: cy, vx: 40, vy: -280, r: 16, life: 99 });
+      for (const s of [-1, 1]) {
+        const h = this.mkPickup(cx, cy, 'heal', false);
+        h.vx = s * 40; h.vy = -280; h.life = 99;
+        w.pickups.push(h);
+      }
     }
 
     if (e.boss) {
@@ -728,6 +767,7 @@ export class Game {
     const p = this.player;
     for (let i = w.bullets.length - 1; i >= 0; i--) {
       const b = w.bullets[i];
+      if (b.warn > 0) { b.warn -= dt; continue; }   // blinker paa bakken, gjoer ingenting enda
       b.life -= dt;
       if (b.homing > 0) {
         b.homing -= dt;
@@ -752,7 +792,7 @@ export class Game {
           if (overlap(box, e)) { this.hurtEnemy(e, b.dmg, b.x, b.y); gone = true; break; }
         }
       } else if (!gone) {
-        if (p.dying <= 0 && overlap(box, p)) { this.damagePlayer(1, b.x); gone = true; }
+        if (p.dying <= 0 && overlap(box, p)) { this.damagePlayer(b.dmg || 12, b.x); gone = true; }
       }
       if (gone) w.bullets.splice(i, 1);
     }
@@ -797,21 +837,48 @@ export class Game {
     const p = this.player;
     for (let i = w.pickups.length - 1; i >= 0; i--) {
       const h = w.pickups[i];
-      h.life -= dt;
-      h.vy += GRAV * 0.5 * dt;
-      h.x += h.vx * dt;
-      h.y += h.vy * dt;
-      if (h.y > GROUND_Y - h.r) { h.y = GROUND_Y - h.r; h.vy = 0; h.vx *= 0.6; }
+      if (!h.anchored) {
+        h.life -= dt;
+        h.vy += GRAV * 0.5 * dt;
+        h.x += h.vx * dt;
+        h.y += h.vy * dt;
+        if (h.y > GROUND_Y - h.r) { h.y = GROUND_Y - h.r; h.vy = 0; h.vx *= 0.6; }
+      }
       const box = { x: h.x - h.r, y: h.y - h.r, w: h.r * 2, h: h.r * 2 };
       if (overlap(box, p)) {
-        if (this.run.hp < this.st.maxHp) this.run.hp++;
-        sound.heart();
-        this.ring(h.x, h.y, 40, '#ef4d5a');
+        this.grabPickup(h);
         w.pickups.splice(i, 1);
       } else if (h.life <= 0) {
         w.pickups.splice(i, 1);
       }
     }
+  }
+
+  grabPickup(h) {
+    const p = this.player;
+    const w = this.world;
+    const def = POWERUPS[h.kind] || POWERUPS.heal;
+    const say = (text, color) => w.texts.push({
+      x: h.x, y: h.y - 10, vy: -62, life: 0.9, max: 0.9, text, color, size: 24,
+    });
+
+    if (h.kind === 'rate') {
+      p.boostRate = def.time;
+      sound.buy();
+      say('⚡ x2', def.color);
+    } else if (h.kind === 'star') {
+      p.boostStar = def.time;
+      sound.buy();
+      say('⭐', def.color);
+    } else {
+      const heal = Math.round(this.st.maxHp * 0.3);
+      const got = Math.min(heal, this.st.maxHp - this.run.hp);
+      this.run.hp = Math.min(this.st.maxHp, this.run.hp + heal);
+      sound.heart();
+      say('+' + got, '#ff9aa6');
+    }
+    this.ring(h.x, h.y, 44, def.color);
+    this.puff(h.x, h.y, 8, def.color);
   }
 
   puff(x, y, n, color) {
@@ -896,7 +963,7 @@ export class Game {
       if (c.x < w.camX - 40 || c.x > w.camX + W + 40) continue;
       art.drawCoin(ctx, c, this.t);
     }
-    for (const h of w.pickups) art.drawHeart(ctx, h.x, h.y, h.r, this.t);
+    for (const h of w.pickups) art.drawPowerup(ctx, h, this.t);
 
     for (const e of w.enemies) {
       if (e.x + e.w < w.camX - 160 || e.x > w.camX + W + 160) continue;
@@ -934,6 +1001,21 @@ export class Game {
 
   drawPlayer(ctx) {
     const p = this.player;
+    // ⭐ usaarbar: gyllen glorie rundt roboten
+    if (p.boostStar > 0) {
+      const fade = Math.min(1, p.boostStar / 1.2);
+      ctx.save();
+      ctx.globalAlpha = (0.3 + 0.16 * Math.sin(this.t * 11)) * fade;
+      ctx.beginPath();
+      ctx.arc(p.x + p.w / 2, p.y + p.h * 0.5, p.h * 0.78, 0, TAU);
+      ctx.fillStyle = '#ffe066';
+      ctx.fill();
+      ctx.globalAlpha = 0.85 * fade;
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = '#fff3b0';
+      ctx.stroke();
+      ctx.restore();
+    }
     if (p.inv > 0 && Math.floor(p.inv * 14) % 2 === 0) return;
     ctx.save();
     if (p.dying > 0) {
@@ -970,9 +1052,18 @@ export class Game {
 
   hudState() {
     const w = this.world;
+    const p = this.player;
+    const boosts = [];
+    if (p && p.boostRate > 0) {
+      boosts.push({ key: 'rate', ico: POWERUPS.rate.ico, left: p.boostRate, frac: p.boostRate / POWERUPS.rate.time });
+    }
+    if (p && p.boostStar > 0) {
+      boosts.push({ key: 'star', ico: POWERUPS.star.ico, left: p.boostStar, frac: p.boostStar / POWERUPS.star.time });
+    }
     return {
+      boosts,
       hp: this.run ? this.run.hp : 0,
-      maxHp: this.st ? this.st.maxHp : 3,
+      maxHp: this.st ? this.st.maxHp : 100,
       coins: this.run ? this.run.coins : 0,
       shield: this.player ? this.player.shieldUp : false,
       progress: w ? clamp((this.player.x - 100) / Math.max(1, w.bossAt - 100), 0, 1) : 0,

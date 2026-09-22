@@ -19,10 +19,14 @@
   <!-- ===== HUD ===== -->
   <div id="hud" class="layer hide">
     <div class="hud-row">
-      <div class="hud-box">
-        <div id="hearts" class="hearts"></div>
+      <div class="hud-box hpbox">
+        <span class="ico">&#10084;&#65039;</span>
+        <div class="hpbar"><div id="hpFill"></div></div>
+        <span id="hpNum">100</span>
+        <span id="shieldIco" class="shield-ico hide">&#128737;&#65039;</span>
       </div>
       <div class="hud-box coins"><span class="ico">&#129689;</span><span id="coinCount">0</span></div>
+      <div id="boosts" class="boosts"></div>
       <div class="hud-grow">
         <div class="progress"><div id="progressFill"></div><span class="flag">&#128681;</span></div>
       </div>

@@ -21,14 +21,38 @@ export function showLayer(id, on) {
 // ---------------------------------------------------------------
 //  HUD
 // ---------------------------------------------------------------
-let lastHearts = '';
+let lastHp = -1;
 let lastCoins = -1;
+let lastBoosts = '';
 
 export function updateHud(h) {
-  const hearts = '❤️'.repeat(h.hp) + '\u{1F5A4}'.repeat(Math.max(0, h.maxHp - h.hp)) +
-    (h.shield ? ' \u{1F6E1}️' : '');
-  if (hearts !== lastHearts) { el('hearts').textContent = hearts; lastHearts = hearts; }
+  const hp = Math.max(0, Math.round(h.hp));
+  if (hp !== lastHp) {
+    lastHp = hp;
+    const frac = h.maxHp > 0 ? hp / h.maxHp : 0;
+    const fill = el('hpFill');
+    fill.style.width = (frac * 100).toFixed(1) + '%';
+    fill.classList.toggle('mid', frac <= 0.55 && frac > 0.28);
+    fill.classList.toggle('low', frac <= 0.28);
+    el('hpNum').textContent = hp;
+  }
+  el('shieldIco').classList.toggle('hide', !h.shield);
   if (h.coins !== lastCoins) { el('coinCount').textContent = h.coins; lastCoins = h.coins; }
+
+  // aktive kraftpakker
+  const sig = h.boosts.map((b) => b.key + Math.ceil(b.left * 4)).join(',');
+  if (sig !== lastBoosts) {
+    lastBoosts = sig;
+    const box = el('boosts');
+    box.innerHTML = '';
+    h.boosts.forEach((b) => {
+      const d = document.createElement('div');
+      d.className = 'boost';
+      d.innerHTML = '<span>' + b.ico + '</span><i style="width:' +
+        (b.frac * 100).toFixed(0) + '%"></i>';
+      box.appendChild(d);
+    });
+  }
   el('progressFill').style.width = (h.progress * 100).toFixed(1) + '%';
   const bw = el('bossWrap');
   if (h.boss == null) {
@@ -40,7 +64,7 @@ export function updateHud(h) {
   }
 }
 
-export function resetHudCache() { lastHearts = ''; lastCoins = -1; }
+export function resetHudCache() { lastHp = -1; lastCoins = -1; lastBoosts = ''; }
 
 // ---------------------------------------------------------------
 //  BUTIKKEN

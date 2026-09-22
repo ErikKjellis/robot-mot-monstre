@@ -50,8 +50,10 @@ export function stats(up) {
     speed: 240 + up.bein * 32,
     jump: 740 + up.bein * 30,
 
-    // PANSER - hjerter og skjold
-    maxHp: 3 + Math.ceil(up.panser * 0.8),   // 3 -> 7
+    // PANSER - helse og skjold.
+    // Helsa er en skala, ikke tre hjerter: et lite monster tar en bit,
+    // en sjef tar en stor bit. Da forsvinner ikke livet paa tre borti-er.
+    maxHp: 100 + up.panser * 25,             // 100 -> 225
     hasShield: up.panser >= 2,
     shieldCool: 9 - up.panser,
 
@@ -73,25 +75,62 @@ export function stats(up) {
 //     'fly'   flyr mot deg (spytter ild hvis den har shotEvery)
 //     'shoot' holder avstand og skyter
 //     'cast'  kaster magi som svinger etter deg
+// touch = hvor mye helse det koster aa borti monsteret
+// skudd = hvor mye skuddene deres tar (mot en skala paa 100)
 export const ENEMIES = {
-  smaadrage:   { hp: 5,  sp: 58,  w: 56, h: 52, ai: 'hop',   coins: [2, 4],  touch: 1, body: '#5fd36a', dark: '#2f8f44', face: '\u{1F432}' },
-  ildoegle:    { hp: 5,  sp: 118, w: 64, h: 46, ai: 'walk',  coins: [2, 5],  touch: 1, body: '#f0743c', dark: '#9c3a12', face: '\u{1F98E}' },
-  flygedrage:  { hp: 4,  sp: 108, w: 68, h: 50, ai: 'fly',   coins: [3, 6],  touch: 1, body: '#7a86c8', dark: '#3e4680', face: '\u{1F409}', shotSpeed: 250, shotEvery: 2.6, shotColor: '#ff9a3d' },
-  isoegle:     { hp: 13, sp: 46,  w: 66, h: 60, ai: 'shoot', coins: [5, 9],  touch: 1, body: '#6fd6ef', dark: '#2a7f96', face: '\u{1F9CA}', shotSpeed: 250, shotEvery: 2.2, shotColor: '#bdf0ff' },
-  steintroll:  { hp: 32, sp: 46,  w: 82, h: 88, ai: 'walk',  coins: [8, 13], touch: 2, body: '#8d8577', dark: '#57514a', face: '\u{1F5FF}' },
-  skyggedrage: { hp: 20, sp: 60,  w: 74, h: 66, ai: 'cast',  coins: [8, 13], touch: 1, body: '#8b5cf6', dark: '#4c2a8f', face: '\u{1F311}', shotSpeed: 165, shotEvery: 2.7, shotColor: '#c9a3ff' },
+  smaadrage:   { hp: 5,  sp: 58,  w: 56, h: 52, ai: 'hop',   coins: [2, 4],  touch: 10, body: '#5fd36a', dark: '#2f8f44', face: '\u{1F432}' },
+  ildoegle:    { hp: 5,  sp: 118, w: 64, h: 46, ai: 'walk',  coins: [2, 5],  touch: 11, body: '#f0743c', dark: '#9c3a12', face: '\u{1F98E}' },
+  flygedrage:  { hp: 4,  sp: 108, w: 68, h: 50, ai: 'fly',   coins: [3, 6],  touch: 11, body: '#7a86c8', dark: '#3e4680', face: '\u{1F409}', shotSpeed: 250, shotEvery: 2.6, shotColor: '#ff9a3d', skudd: 10 },
+  isoegle:     { hp: 13, sp: 46,  w: 66, h: 60, ai: 'shoot', coins: [5, 9],  touch: 13, body: '#6fd6ef', dark: '#2a7f96', face: '\u{1F9CA}', shotSpeed: 250, shotEvery: 2.2, shotColor: '#bdf0ff', skudd: 12 },
+  steintroll:  { hp: 32, sp: 46,  w: 82, h: 88, ai: 'walk',  coins: [8, 13], touch: 22, body: '#8d8577', dark: '#57514a', face: '\u{1F5FF}' },
+  skyggedrage: { hp: 20, sp: 60,  w: 74, h: 66, ai: 'cast',  coins: [8, 13], touch: 15, body: '#8b5cf6', dark: '#4c2a8f', face: '\u{1F311}', shotSpeed: 165, shotEvery: 2.7, shotColor: '#c9a3ff', skudd: 14 },
 };
 
 // ============================================================
 //  SJEFER - kjempestore, en paa slutten av hvert nivaa
 // ============================================================
+// slamEvery  = sekunder mellom smellene
+// shockCount = 1 gir bare en boelge, mot spilleren. 2 gir en til hver side.
+// shockWarn  = hvor lenge boelgen blinker paa bakken FOER den begynner aa rulle,
+//              saa man rekker aa se den komme og hoppe.
 export const BOSSES = {
-  godzaur:     { hp: 40,  w: 200, h: 180, sp: 56,  body: '#4f8f5a', dark: '#23512d', face: '\u{1F996}', pattern: 'slam',         coins: 65 },
-  roddrage:    { hp: 130, w: 250, h: 150, sp: 125, body: '#e04b3a', dark: '#8c1c14', face: '\u{1F409}', fly: true, pattern: 'dive-bomb', coins: 100 },
-  hydra:       { hp: 200, w: 220, h: 190, sp: 80,  body: '#3fb98a', dark: '#1a6b4d', face: '\u{1F40D}', pattern: 'spread',       coins: 145 },
-  frostdragen: { hp: 300, w: 225, h: 200, sp: 98,  body: '#7fd8f0', dark: '#256f8a', face: '❄️', fly: true, pattern: 'teleport-orb', coins: 200 },
-  kolossen:    { hp: 400, w: 235, h: 225, sp: 60,  body: '#a06a4a', dark: '#5a3624', face: '\u{1F5FF}', pattern: 'jump-spawn',   coins: 265 },
-  kongedragen: { hp: 560, w: 290, h: 250, sp: 90,  body: '#f0a63c', dark: '#8a520c', face: '\u{1F451}', pattern: 'all-in',       coins: 360 },
+  godzaur: {
+    hp: 40, w: 200, h: 180, sp: 56, body: '#4f8f5a', dark: '#23512d',
+    face: '\u{1F996}', pattern: 'slam', coins: 65, touch: 14,
+    slamEvery: 4.2, shockCount: 1, shockSpeed: 170, shockDmg: 10, shockWarn: 0.6,
+  },
+  roddrage: {
+    hp: 130, w: 250, h: 150, sp: 125, body: '#e04b3a', dark: '#8c1c14',
+    face: '\u{1F409}', fly: true, pattern: 'dive-bomb', coins: 100, touch: 18, skudd: 13,
+    shockCount: 2, shockSpeed: 215, shockDmg: 13, shockWarn: 0.45,
+  },
+  hydra: {
+    hp: 200, w: 220, h: 190, sp: 80, body: '#3fb98a', dark: '#1a6b4d',
+    face: '\u{1F40D}', pattern: 'spread', coins: 145, touch: 20, skudd: 14,
+  },
+  frostdragen: {
+    hp: 300, w: 225, h: 200, sp: 98, body: '#7fd8f0', dark: '#256f8a',
+    face: '❄️', fly: true, pattern: 'teleport-orb', coins: 200, touch: 22, skudd: 15,
+  },
+  kolossen: {
+    hp: 400, w: 235, h: 225, sp: 60, body: '#a06a4a', dark: '#5a3624',
+    face: '\u{1F5FF}', pattern: 'jump-spawn', coins: 265, touch: 26,
+    slamEvery: 3.2, shockCount: 2, shockSpeed: 250, shockDmg: 18, shockWarn: 0.35,
+  },
+  kongedragen: {
+    hp: 560, w: 290, h: 250, sp: 90, body: '#f0a63c', dark: '#8a520c',
+    face: '\u{1F451}', pattern: 'all-in', coins: 360, touch: 28, skudd: 16,
+    slamEvery: 2.6, shockCount: 2, shockSpeed: 275, shockDmg: 20, shockWarn: 0.3,
+  },
+};
+
+// ============================================================
+//  KRAFTPAKKER - ligger paa de hoeye plattformene
+// ============================================================
+export const POWERUPS = {
+  rate: { ico: '⚡', time: 10, color: '#ffd93d', dark: '#b8860b' },
+  star: { ico: '⭐', time: 8,  color: '#7fe8ff', dark: '#2a7f96' },
+  heal: { ico: '❤️', time: 0, color: '#ef4d5a', dark: '#8c1c28' },
 };
 
 // ============================================================

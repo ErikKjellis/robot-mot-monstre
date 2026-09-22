@@ -45,7 +45,34 @@ button{touch-action:none;-webkit-touch-callout:none;}
 }
 .hud-box .ico{font-size:1.05em;}
 .hud-box.big{font-size:clamp(20px,4vh,34px);padding:6px 16px;}
-.hearts{letter-spacing:1px;font-size:clamp(15px,3vh,25px);white-space:nowrap;}
+/* Helse som skala, ikke tre hjerter */
+.hpbox{gap:8px;}
+.hpbar{
+  width:clamp(92px,17vw,190px);height:clamp(13px,2.3vh,21px);
+  border-radius:999px;background:rgba(0,0,0,.45);
+  border:2px solid rgba(255,255,255,.22);overflow:hidden;
+}
+#hpFill{
+  height:100%;width:100%;border-radius:999px;
+  background:linear-gradient(90deg,#63e08a,#39c26a);
+  transition:width .16s ease, background .3s ease;
+}
+#hpFill.mid{background:linear-gradient(90deg,#ffd93d,#f0a63c);}
+#hpFill.low{background:linear-gradient(90deg,#ff8a8a,#ef4d5a);}
+#hpNum{font-variant-numeric:tabular-nums;min-width:2.4em;text-align:right;
+  font-size:clamp(13px,2.5vh,21px);}
+.shield-ico{font-size:1em;}
+
+/* Aktive kraftpakker */
+.boosts{display:flex;gap:6px;}
+.boost{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  background:rgba(12,18,38,.62);border:3px solid rgba(255,255,255,.22);
+  border-radius:12px;padding:2px 7px 4px;
+}
+.boost span{font-size:clamp(15px,2.9vh,24px);line-height:1;}
+.boost i{display:block;height:4px;width:clamp(22px,4vw,40px);border-radius:999px;
+  background:#f7c33a;transition:width .1s linear;}
 .hud-grow{flex:1;min-width:40px;}
 .progress{
   position:relative;height:clamp(14px,2.4vh,22px);border-radius:999px;

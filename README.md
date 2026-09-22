@@ -115,10 +115,29 @@ magi som svinger etter roboten.
 | | | |
 |---|---|---|
 | 🔫 **KANON** — hardere og raskere skudd | 👁️ **LASER** — laserøyne som skyter av seg selv | 🔨 **HAMMER** — smeller på alt som kommer nær |
-| 🦿 **BEIN** — løper og hopper bedre | 🛡️ **PANSER** — flere hjerter og skjold | 🚀 **JET** — dobbelt- og trippelhopp |
+| 🦿 **BEIN** — løper og hopper bedre | 🛡️ **PANSER** — mer helse og skjold | 🚀 **JET** — dobbelt- og trippelhopp |
 
 Hver kan kjøpes 5 ganger, og **hver eneste en gjør roboten større**.
-Hjertene fylles opp ved starten av hvert nivå.
+Helsa fylles opp ved starten av hvert nivå.
+
+### Helse
+
+Helsa er en skala fra 100 (opp til 225 med PANSER), ikke noen få hjerter. Et
+lite monster tar en liten bit, et steintroll tar en stor. Da holder roboten til
+rundt ti smeller i stedet for tre, og det gjør ikke like vondt å bomme.
+
+### Kraftpakker
+
+Oppe på de **høye plattformene** ligger det kraftpakker — det er derfor det er
+verdt å klatre:
+
+| | |
+|---|---|
+| ⚡ **Dobbel skuddfart** i 10 sekunder | ⭐ **Usårbar** i 8 sekunder (gyllen glorie rundt roboten) |
+| ❤️ **Helse** tilbake | |
+
+Aktive kraftpakker vises øverst med en nedtelling. Monstre slipper også hjerter
+av og til.
 
 ## Poeng
 
@@ -135,8 +154,11 @@ lagres i nettleseren på nettbrettet (`localStorage`).
 
 Nesten alt som bestemmer vanskelighetsgrad ligger i [`js/content.js`](js/content.js):
 
-- `ENEMIES` — helse, fart og skade på hvert monster
-- `BOSSES` — sjefenes helse og angrepsmønster
+- `ENEMIES` — helse, fart og `touch` (hvor mye det koster å borti dem)
+- `BOSSES` — sjefenes helse og angrepsmønster. `slamEvery`, `shockSpeed`,
+  `shockDmg` og `shockWarn` styrer sjokkbølgene — `shockWarn` er hvor lenge
+  bølgen blinker på bakken før den ruller, altså hvor god tid man får til å hoppe
+- `POWERUPS` — hvor lenge ⚡ og ⭐ varer
 - `LEVELS` — banelengde, hvilke monstre som dukker opp, hvor mange mynter
 - `UPGRADES` / `stats()` — priser og hva oppgraderingene gjør
 - `levelScale()` — hvor mye seigere monstrene blir utover i spillet

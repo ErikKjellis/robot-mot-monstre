@@ -602,7 +602,85 @@ export function drawHeart(ctx, x, y, r, t) {
   ctx.restore();
 }
 
+/** Kraftpakke paa en plattform: ⚡ dobbel skuddfart, ⭐ usaarbar, ❤️ helse. */
+export function drawPowerup(ctx, h, t) {
+  const bob = Math.sin(t * 3 + h.seed) * 5;
+  const y = h.y + bob;
+  const r = h.r;
+  ctx.save();
+  // glorie
+  const glow = 0.45 + 0.25 * Math.sin(t * 4 + h.seed);
+  const col = h.kind === 'rate' ? '#ffd93d' : h.kind === 'star' ? '#7fe8ff' : '#ef4d5a';
+  ctx.globalAlpha = glow * 0.5;
+  circ(ctx, h.x, y, r * 1.85, col);
+  ctx.globalAlpha = 1;
+
+  if (h.kind === 'heal') {
+    drawHeart(ctx, h.x, y, r * 0.95, t);
+  } else {
+    rr(ctx, h.x - r, y - r, r * 2, r * 2, r * 0.55,
+      h.kind === 'rate' ? '#fff3b0' : '#dff8ff', OUT, 3.5);
+    if (h.kind === 'rate') {
+      poly(ctx, [
+        [h.x + r * 0.22, y - r * 0.62], [h.x - r * 0.34, y + r * 0.1],
+        [h.x - r * 0.02, y + r * 0.1], [h.x - r * 0.2, y + r * 0.66],
+        [h.x + r * 0.36, y - r * 0.08], [h.x + r * 0.03, y - r * 0.08],
+      ], '#f0a60c', OUT, 2.5);
+    } else {
+      const pts = [];
+      for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        const rad = i % 2 === 0 ? r * 0.72 : r * 0.3;
+        pts.push([h.x + Math.cos(a) * rad, y + Math.sin(a) * rad]);
+      }
+      poly(ctx, pts, '#3aa0ee', OUT, 2.5);
+    }
+  }
+  ctx.restore();
+}
+
 export function drawBullet(ctx, b) {
+  // Sjokkboelge som blinker paa bakken foer den begynner aa rulle.
+  if (b.warn > 0) {
+    const pulse = 0.45 + 0.55 * Math.abs(Math.sin(b.warn * 22));
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.beginPath();
+    ctx.ellipse(b.x, b.y + b.r * 0.6, b.r * 1.9, b.r * 0.7, 0, 0, TAU);
+    ctx.fillStyle = '#ff9a3d';
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#fff3b0';
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.font = 'bold 30px Verdana, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = OUT;
+    ctx.strokeText('!', b.x, b.y - b.r * 0.8);
+    ctx.fillStyle = '#ffe066';
+    ctx.fillText('!', b.x, b.y - b.r * 0.8);
+    ctx.restore();
+    return;
+  }
+  if (b.shock) {
+    // rullende boelge - bred og tydelig, saa den leses som "hopp over meg"
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ell(ctx, b.x, b.y + b.r * 0.5, b.r * 1.7, b.r * 0.8, '#ff9a3d');
+    ctx.restore();
+    ctx.beginPath();
+    ctx.moveTo(b.x - b.r * 1.3, b.y + b.r * 0.9);
+    ctx.quadraticCurveTo(b.x, b.y - b.r * 1.5, b.x + b.r * 1.3, b.y + b.r * 0.9);
+    ctx.closePath();
+    ctx.fillStyle = '#ffb057';
+    ctx.fill();
+    ctx.strokeStyle = OUT;
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+    circ(ctx, b.x, b.y + b.r * 0.1, b.r * 0.42, '#fff3b0');
+    return;
+  }
   if (b.friendly) {
     ctx.save();
     ctx.globalAlpha = 0.45;
