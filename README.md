@@ -41,10 +41,15 @@ node serve.js
 
 Styrespaken er analog — dytter du den litt, går roboten sakte.
 
-**Roboten skyter av seg selv** på monstre den har rett foran seg, så man slipper
-å holde skyteknappen og hoppeknappen samtidig med samme tommel. Trykker du 💥
-selv, skyter den litt raskere. Laseren og hammeren går også av seg selv når du
-har kjøpt dem. Du kan dessuten hoppe **oppå** små monstre for å knuse dem.
+**Styrespaken sikter også.** Dytt den opp eller på skrå, så peker kanonen dit, og
+skuddene går den veien. Dytter du rett opp, står roboten stille og skyter rett
+opp. Det er sånn man tar de flygende dragene.
+
+**Roboten sikter og skyter av seg selv** når du ikke sikter selv — den finner
+nærmeste monster, også det som flyr høyt oppe. Da slipper man å holde
+skyteknappen og hoppeknappen samtidig med samme tommel. Trykker du 💥 selv,
+skyter den litt raskere. Laseren og hammeren går også av seg selv når du har
+kjøpt dem. Du kan dessuten hoppe **oppå** små monstre for å knuse dem.
 
 ---
 
@@ -114,7 +119,7 @@ magi som svinger etter roboten.
 
 | | | |
 |---|---|---|
-| 🔫 **KANON** — hardere og raskere skudd | 👁️ **LASER** — laserøyne som skyter av seg selv | 🔨 **HAMMER** — smeller på alt som kommer nær |
+| 🔫 **KANON** — hardere og raskere skudd. Hvert nivå er et helt nytt våpen: pistol → rifle → dobbeltløp → gatling → energikanon, og skuddene ser forskjellige ut | 👁️ **LASER** — laserøyne som skyter av seg selv | 🔨 **HAMMER** — smeller på alt som kommer nær |
 | 🦿 **BEIN** — løper og hopper bedre | 🛡️ **PANSER** — mer helse og skjold | 🚀 **JET** — dobbelt- og trippelhopp |
 
 Hver kan kjøpes 5 ganger, og **hver eneste en gjør roboten større**.

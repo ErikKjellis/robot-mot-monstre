@@ -191,8 +191,11 @@ export const sound = new Sound();
 // ============================================================
 
 export const input = {
-  stickX: 0,     // -1..1 fra styrespaken
+  stickX: 0,     // -1..1 fra styrespaken, styrer gangen
   keyX: 0,       // -1..1 fra tastaturet
+  aimX: 1,       // retningen spaken peker (enhetsvektor) - styrer siktet
+  aimY: 0,
+  aimMag: 0,     // hvor langt ut spaken er dyttet, 0..1
   shoot: false,
   jumpHeld: false,
   jumpBuffer: 0, // liten "husk trykket"-tid, gjoer hoppingen snill
@@ -218,6 +221,7 @@ function press(act, down) {
 export function clearInput() {
   keyL = keyR = false;
   input.stickX = input.keyX = 0;
+  input.aimMag = 0;
   input.shoot = input.jumpHeld = false;
   input.jumpBuffer = 0;
   if (releaseStick) releaseStick();
@@ -247,6 +251,9 @@ export function setupStick(zone, stick, knob) {
       v = Math.sign(nx) * Math.min(1, ((Math.abs(nx) - DEAD) / (1 - DEAD)) * 1.7);
     }
     input.stickX = v;
+    // Retningen spaken peker brukes til aa sikte. Dytt opp for aa skyte opp.
+    input.aimMag = k;
+    if (d > 0) { input.aimX = dx / d; input.aimY = dy / d; }
     const kx = d > 0 ? (dx / d) * k * R : 0;
     const ky = d > 0 ? (dy / d) * k * R : 0;
     knob.style.transform = 'translate(calc(-50% + ' + kx.toFixed(1) + 'px), calc(-50% + ' + ky.toFixed(1) + 'px))';
@@ -255,6 +262,7 @@ export function setupStick(zone, stick, knob) {
   function release() {
     id = null;
     input.stickX = 0;
+    input.aimMag = 0;
     stick.classList.remove('on');
     stick.style.left = stick.style.top = stick.style.bottom = stick.style.transform = '';
     knob.style.transform = 'translate(-50%, -50%)';

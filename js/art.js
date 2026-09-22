@@ -166,24 +166,16 @@ export function drawRobot(ctx, cx, by, h, o = {}) {
   }
 
   // ---------- KANONARM ----------
+  // Hvert kanonnivaa er et HELT nytt vaapen, ikke bare et lengre roer.
   ctx.save();
   ctx.translate(bodyW * 0.3, armY + bodyH * 0.1);
-  ctx.rotate((o.aim || 0) * 0.4 - (o.flashShot || 0) * 0.3);
+  ctx.rotate((o.aim || 0) - (o.flashShot || 0) * 0.25);
   rr(ctx, -h * 0.05, -h * 0.06, h * 0.14, h * 0.13, h * 0.05, main, OUT, lw);
-  if (kanon > 0) {
-    const barrel = h * (0.22 + 0.048 * kanon);
-    const bRad = h * (0.07 + 0.013 * kanon);
-    rr(ctx, h * 0.05, -bRad / 2, barrel, bRad, bRad * 0.4, gold ? GOLD : dark, OUT, lw);
-    rr(ctx, h * 0.05 + barrel - h * 0.035, -bRad * 0.66, h * 0.045, bRad * 1.32, h * 0.018, M_LIGHT, OUT, lw * 0.7);
-    if (kanon >= 3) rr(ctx, h * 0.09, -bRad * 0.85, barrel * 0.4, bRad * 0.3, h * 0.012, VISOR);
-    if (o.flashShot > 0) {
-      const r = h * 0.11 * o.flashShot;
-      circ(ctx, h * 0.05 + barrel + r * 0.4, 0, r, '#fff6c0');
-      circ(ctx, h * 0.05 + barrel + r * 0.4, 0, r * 0.55, '#ffffff');
-    }
-  } else {
-    // helt enkel klo foer du kjoeper kanon
-    rr(ctx, h * 0.05, -h * 0.035, h * 0.10, h * 0.07, h * 0.03, dark, OUT, lw);
+  const tip = drawCannon(ctx, h, kanon, lw, main, dark, gold);
+  if (kanon > 0 && o.flashShot > 0) {
+    const r = h * (0.09 + kanon * 0.012) * o.flashShot;
+    circ(ctx, tip + r * 0.4, 0, r, kanon >= 4 ? '#ffd0f0' : '#fff6c0');
+    circ(ctx, tip + r * 0.4, 0, r * 0.55, '#ffffff');
   }
   ctx.restore();
 
@@ -228,6 +220,81 @@ export function drawRobot(ctx, cx, by, h, o = {}) {
     circ(ctx, cx, by - h * 0.5, h * 0.62, null, '#bff4ff', Math.max(2, h * 0.028));
     ctx.restore();
   }
+}
+
+/**
+ * Tegner vaapenet for et gitt kanonnivaa. Returnerer hvor munningen er,
+ * slik at muzzle-blaffet havner paa rett sted.
+ *   0 klo  1 pistol  2 rifle  3 dobbeltloep  4 gatling  5 energikanon
+ */
+function drawCannon(ctx, h, lvl, lw, main, dark, gold) {
+  const metal = gold ? GOLD : dark;
+  const x0 = h * 0.05;
+
+  if (lvl <= 0) {
+    rr(ctx, x0, -h * 0.035, h * 0.10, h * 0.07, h * 0.03, dark, OUT, lw);
+    return x0 + h * 0.10;
+  }
+
+  if (lvl === 1) {
+    // liten pistol
+    const len = h * 0.26, r = h * 0.075;
+    rr(ctx, x0, -r / 2, len, r, r * 0.4, metal, OUT, lw);
+    rr(ctx, x0 + len - h * 0.03, -r * 0.8, h * 0.04, r * 1.6, h * 0.015, M_LIGHT, OUT, lw * 0.7);
+    return x0 + len;
+  }
+
+  if (lvl === 2) {
+    // rifle med sikte paa toppen
+    const len = h * 0.36, r = h * 0.085;
+    rr(ctx, x0, -r / 2, len, r, r * 0.35, metal, OUT, lw);
+    rr(ctx, x0 + h * 0.05, -r * 1.35, h * 0.12, r * 0.7, h * 0.015, dark, OUT, lw * 0.7);
+    circ(ctx, x0 + h * 0.11, -r * 1.0, h * 0.022, VISOR, OUT, lw * 0.6);
+    rr(ctx, x0 + len - h * 0.04, -r * 0.85, h * 0.05, r * 1.7, h * 0.018, M_LIGHT, OUT, lw * 0.7);
+    return x0 + len;
+  }
+
+  if (lvl === 3) {
+    // to loep ved siden av hverandre
+    const len = h * 0.40, r = h * 0.062;
+    for (const s of [-1, 1]) {
+      rr(ctx, x0, s * r * 0.85 - r / 2, len, r, r * 0.4, metal, OUT, lw * 0.9);
+      rr(ctx, x0 + len - h * 0.035, s * r * 0.85 - r * 0.78, h * 0.045, r * 1.56, h * 0.015, M_LIGHT, OUT, lw * 0.6);
+    }
+    rr(ctx, x0, -r * 1.5, h * 0.12, r * 3, h * 0.02, dark, OUT, lw * 0.8);
+    rr(ctx, x0 + h * 0.03, -r * 0.5, h * 0.06, r, h * 0.01, VISOR);
+    return x0 + len;
+  }
+
+  if (lvl === 4) {
+    // gatling med roterende tromme
+    const len = h * 0.46, r = h * 0.11;
+    circ(ctx, x0 + h * 0.09, 0, r * 0.95, dark, OUT, lw);
+    for (let i = -1; i <= 1; i++) {
+      rr(ctx, x0 + h * 0.08, i * r * 0.62 - h * 0.022, len - h * 0.06, h * 0.044, h * 0.018,
+        i === 0 ? M_LIGHT : metal, OUT, lw * 0.8);
+    }
+    circ(ctx, x0 + h * 0.09, 0, r * 0.34, gold ? '#fff0b0' : VISOR, OUT, lw * 0.6);
+    return x0 + len;
+  }
+
+  // lvl 5: energikanon med traktmunning og glodende kjerne
+  const len = h * 0.44, r = h * 0.1;
+  rr(ctx, x0, -r * 0.62, len * 0.7, r * 1.24, r * 0.4, metal, OUT, lw);
+  circ(ctx, x0 + len * 0.3, 0, r * 0.52, '#ff6bd6', OUT, lw * 0.7);
+  circ(ctx, x0 + len * 0.3, 0, r * 0.26, '#ffffff');
+  // trakt
+  poly(ctx, [
+    [x0 + len * 0.66, -r * 0.7], [x0 + len, -r * 1.35],
+    [x0 + len, r * 1.35], [x0 + len * 0.66, r * 0.7],
+  ], M_LIGHT, OUT, lw);
+  for (const s of [-1, 1]) {
+    poly(ctx, [
+      [x0 + len * 0.86, s * r * 1.1], [x0 + len * 1.16, s * r * 1.5],
+      [x0 + len * 0.98, s * r * 0.62],
+    ], '#ff6bd6', OUT, lw * 0.6);
+  }
+  return x0 + len;
 }
 
 /** Robotens hodehoeyde over bakken - der laserstraalen starter. */
@@ -639,6 +706,60 @@ export function drawPowerup(ctx, h, t) {
   ctx.restore();
 }
 
+/** Robotens eget skudd. Ser forskjellig ut for hvert kanonnivaa. */
+function drawShot(ctx, b) {
+  const lvl = b.tier | 0;
+  const r = b.r;
+  const ang = Math.atan2(b.vy, b.vx);
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.rotate(ang);
+
+  if (lvl <= 1) {
+    ctx.globalAlpha = 0.4;
+    circ(ctx, 0, 0, r * 2, '#5ee6ff');
+    ctx.globalAlpha = 1;
+    circ(ctx, 0, 0, r, '#ffffff', '#5ee6ff', 3);
+  } else if (lvl === 2) {
+    ctx.globalAlpha = 0.35;
+    ell(ctx, -r * 1.1, 0, r * 2.2, r * 0.8, '#5ee6ff');
+    ctx.globalAlpha = 1;
+    ell(ctx, 0, 0, r * 1.5, r * 0.88, '#d8fbff', '#3ac6ee', 3);
+    circ(ctx, r * 0.35, 0, r * 0.45, '#ffffff');
+  } else if (lvl === 3) {
+    // to smaa bolter, som de to loepene
+    ctx.globalAlpha = 0.35;
+    ell(ctx, -r * 0.8, 0, r * 2, r * 1.2, '#7dff9c');
+    ctx.globalAlpha = 1;
+    for (const s of [-1, 1]) {
+      ell(ctx, 0, s * r * 0.55, r * 1.25, r * 0.5, '#eaffe9', '#2fae52', 2.5);
+    }
+  } else if (lvl === 4) {
+    // tung plasmakule med ring
+    ctx.globalAlpha = 0.4;
+    circ(ctx, 0, 0, r * 2.3, '#ffb057');
+    ctx.globalAlpha = 1;
+    circ(ctx, 0, 0, r * 1.15, '#ffd93d', '#d97706', 3);
+    circ(ctx, -r * 0.3, -r * 0.3, r * 0.4, '#fff6c0');
+    ctx.globalAlpha = 0.85;
+    ell(ctx, 0, 0, r * 1.75, r * 0.5, null, '#fff0b0', 3);
+  } else {
+    // energistjerne
+    ctx.globalAlpha = 0.45;
+    circ(ctx, 0, 0, r * 2.6, '#ff6bd6');
+    ctx.globalAlpha = 1;
+    const pts = [];
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4;
+      const rad = i % 2 === 0 ? r * 1.7 : r * 0.72;
+      pts.push([Math.cos(a) * rad, Math.sin(a) * rad]);
+    }
+    poly(ctx, pts, '#ffd6f4', '#c026a3', 3);
+    circ(ctx, 0, 0, r * 0.55, '#ffffff');
+  }
+  ctx.restore();
+}
+
 export function drawBullet(ctx, b) {
   // Sjokkboelge som blinker paa bakken foer den begynner aa rulle.
   if (b.warn > 0) {
@@ -682,11 +803,7 @@ export function drawBullet(ctx, b) {
     return;
   }
   if (b.friendly) {
-    ctx.save();
-    ctx.globalAlpha = 0.45;
-    circ(ctx, b.x, b.y, b.r * 2.1, '#5ee6ff');
-    ctx.restore();
-    circ(ctx, b.x, b.y, b.r, '#ffffff', '#5ee6ff', 3);
+    drawShot(ctx, b);
   } else {
     ctx.save();
     ctx.globalAlpha = 0.4;

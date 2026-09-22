@@ -166,6 +166,14 @@ Har du kjøpt kanon nivå 3, leter spillet etter `arm-fram-kanon3.png`, så
 lage alle fem** — lag `-kanon1.png` og `-kanon3.png`, så bytter roboten utseende
 to ganger på veien.
 
+Spillets egne kanoner er fem forskjellige våpen (pistol, rifle, dobbeltløp,
+gatling, energikanon), så tegn gjerne dine som fem forskjellige våpen også — ikke
+bare det samme røret i fem lengder.
+
+**Viktig for `arm-fram` og `vapen`:** armen roterer når roboten sikter opp eller
+på skrå. Tegn den derfor slik at skulderen ligger på den gule prikken i malen,
+og med våpenet pekende rett mot høyre. Da peker det riktig vei i alle vinkler.
+
 Roboten blir dessuten større for hver eneste oppgradering, fra 50 til 119
 piksler høy. Tegn den derfor som den ser ut **ferdig utbygd** — den skaleres ned
 når den er liten.

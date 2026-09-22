@@ -100,9 +100,9 @@ const MOVES = {
   // hale som logrer
   hale: (p, s) => ({ rot: Math.sin(s.t * 2.4 + (p.fase || 0)) * (p.styrke ?? 0.18) }),
 
-  // vaapenarm: sikter og rykker bakover naar den skyter
+  // vaapenarm: peker dit du sikter, og rykker bakover naar den skyter
   sikte: (p, s) => ({
-    rot: (s.aim || 0) * 0.5 - (s.recoil || 0) * 0.55,
+    rot: (s.aim || 0) - (s.recoil || 0) * 0.3,
     dx: -(s.recoil || 0) * 0.05,
   }),
 

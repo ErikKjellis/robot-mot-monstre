@@ -167,7 +167,7 @@ export class Game {
       coyote: 0, cool: 0, inv: 0, walk: 0, flashShot: 0,
       shieldUp: this.st.hasShield, shieldT: 0, dying: 0,
       jumpsLeft: 0, laserCool: 1.2, smashCool: 0.6, smashT: 0,
-      boostRate: 0, boostStar: 0,
+      boostRate: 0, boostStar: 0, aim: 0,
     };
     this.shakeT = 0;
   }
@@ -286,17 +286,34 @@ export class Game {
     p.boostRate = Math.max(0, p.boostRate - dt);
     p.boostStar = Math.max(0, p.boostStar - dt);
 
+    // --- SIKTE ---
+    // Dytter du spaken opp eller paa skraa, sikter roboten dit. Ellers sikter
+    // den selv paa det naermeste monsteret - ogsaa det som flyr hoeyt oppe.
+    const cx = p.x + p.w / 2, cy = p.y + p.h * 0.42;
+    const stickAim = input.aimMag > 0.3 && Math.abs(input.aimY) > 0.35;
+    const aimAt = this.nearestTarget(640);
+    if (stickAim) {
+      p.aim = Math.atan2(input.aimY, input.aimX);
+      if (Math.abs(input.aimX) > 0.25) p.facing = input.aimX > 0 ? 1 : -1;
+    } else if (aimAt) {
+      p.aim = Math.atan2(aimAt.y + aimAt.h / 2 - cy, aimAt.x + aimAt.w / 2 - cx);
+    } else {
+      p.aim = p.facing > 0 ? 0 : Math.PI;
+    }
+
     let firing = input.shoot;
     let coolMul = p.boostRate > 0 ? 0.5 : 1;     // ⚡ dobbel skuddfart
-    if (!firing && this.enemyAhead(540)) { firing = true; coolMul *= 1.3; }
+    if (!firing && aimAt) { firing = true; coolMul *= 1.3; }
     if (firing && p.cool <= 0) {
       p.cool = st.cool * coolMul;
       p.flashShot = 1;
-      const bx = p.x + p.w / 2 + p.facing * (p.h * 0.42);
-      const by = p.y + p.h * 0.42;
+      const reach = p.h * 0.46;
+      const ca = Math.cos(p.aim), sa = Math.sin(p.aim);
       w.bullets.push({
-        x: bx, y: by, vx: p.facing * 780, vy: 0,
+        x: cx + ca * reach, y: cy + sa * reach,
+        vx: ca * 780, vy: sa * 780,
         r: 7 + st.dmg * 0.5, dmg: st.dmg, friendly: true, life: 1.5,
+        tier: this.run.up.kanon | 0,
       });
       sound.shoot();
     }
@@ -321,18 +338,22 @@ export class Game {
     if (p.inv > 0) p.inv -= dt;
   }
 
-  /** Er det et monster rett foran roboten? Brukt til automatisk skyting. */
-  enemyAhead(range) {
+  /**
+   * Naermeste monster roboten kan skyte paa - i den retningen den ser, eller
+   * rett over/under seg. Brukt baade til automatisk sikting og skyting.
+   */
+  nearestTarget(range) {
     const p = this.player;
-    const cx = p.x + p.w / 2, cy = p.y + p.h * 0.5;
+    const cx = p.x + p.w / 2, cy = p.y + p.h * 0.42;
+    let best = null, bd = Infinity;
     for (const e of this.world.enemies) {
       const dx = (e.x + e.w / 2) - cx;
-      if (Math.sign(dx) !== p.facing && Math.abs(dx) > e.w * 0.5) continue;
-      if (Math.abs(dx) > range) continue;
-      if (Math.abs((e.y + e.h / 2) - cy) > e.h * 0.5 + p.h * 0.7) continue;
-      return true;
+      // ikke snu seg etter noe langt bak, men ta med det som er rett over
+      if (Math.abs(dx) > 130 && Math.sign(dx) !== p.facing) continue;
+      const d = Math.hypot(dx, (e.y + e.h / 2) - cy);
+      if (d < range && d < bd) { bd = d; best = e; }
     }
-    return false;
+    return best;
   }
 
   fireLaser() {
@@ -1023,12 +1044,20 @@ export class Game {
       ctx.rotate((1.3 - p.dying) * 3);
       ctx.translate(-(p.x + p.w / 2), -(p.y + p.h / 2));
     }
+    // Siktevinkelen regnes om til robotens egen retning, slik at armen peker
+    // rett vei ogsaa naar hele figuren er speilvendt.
+    let a = p.aim || 0;
+    if (p.facing < 0) a = Math.PI - a;
+    while (a > Math.PI) a -= TAU;
+    while (a < -Math.PI) a += TAU;
+    const localAim = clamp(a, -1.25, 1.25);
+
     const s = {
       x: p.x + p.w / 2, y: p.y + p.h, h: p.h,
       facing: p.facing, walk: p.walk,
       move: Math.abs(p.vx) > 30 ? 1 : 0,
       t: this.t,
-      aim: 0, recoil: p.flashShot, smash: p.smashT / 0.28,
+      aim: localAim, recoil: p.flashShot, smash: p.smashT / 0.28,
       flash: p.inv > 0.9,
       variants: this.run.up,
     };
@@ -1036,8 +1065,8 @@ export class Game {
       art.drawRobot(ctx, s.x, s.y, p.h, {
         up: this.run.up, facing: p.facing, walk: p.walk,
         moving: s.move > 0, onGround: p.onGround, t: this.t,
-        flashShot: p.flashShot, smash: s.smash, shieldOn: p.shieldUp,
-        flash: p.inv > 0.9,
+        aim: localAim, flashShot: p.flashShot, smash: s.smash,
+        shieldOn: p.shieldUp, flash: p.inv > 0.9,
       });
     } else if (p.shieldUp) {
       ctx.save();
