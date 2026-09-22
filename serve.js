@@ -29,7 +29,9 @@ http.createServer((req, res) => {
   }
   fs.readFile(file, (err, data) => {
     if (err) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' }).end('404');
+      // Viktig: ikke la nettleseren huske at fila manglet - da dukker
+      // ikke en ny PNG opp foer du toemmer cachen.
+      res.writeHead(404, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' }).end('404');
       return;
     }
     res.writeHead(200, {

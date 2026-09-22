@@ -3,6 +3,8 @@
 import { store, sound } from './core.js';
 import { UPGRADES, MAX_LEVEL, LEVELS } from './content.js';
 import { renderBotPreview } from './art.js';
+import { ROBOT_RIG } from './rigs.js';
+import { drawRig } from './sprites.js';
 
 export const el = (id) => document.getElementById(id);
 
@@ -107,12 +109,23 @@ export function refreshShop(game) {
 // ---------------------------------------------------------------
 //  ROBOT-FORHÅNDSVISNING
 // ---------------------------------------------------------------
+/** Tegner roboten i menyen. Bruker egne PNG-deler hvis du har laget noen. */
+function previewInto(canvas, up, t) {
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const ok = drawRig(ctx, ROBOT_RIG, {
+    x: canvas.width / 2, y: canvas.height * 0.97, h: canvas.height * 0.84,
+    facing: 1, walk: t * 2, move: 0, t, aim: 0, recoil: 0, smash: 0, variants: up,
+  });
+  if (!ok) renderBotPreview(canvas, up, t);
+}
+
 export function drawPreviews(game, t) {
   const up = game.run ? game.run.up : {};
   const a = el('shopBot');
-  if (a && !el('scrShop').classList.contains('hide')) renderBotPreview(a, up, t);
+  if (a && !el('scrShop').classList.contains('hide')) previewInto(a, up, t);
   const b = el('titleBot');
-  if (b && !el('scrTitle').classList.contains('hide')) renderBotPreview(b, {}, t);
+  if (b && !el('scrTitle').classList.contains('hide')) previewInto(b, {}, t);
 }
 
 // ---------------------------------------------------------------

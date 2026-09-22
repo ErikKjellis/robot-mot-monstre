@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Figurtest - Robot mot Monstre</title>
+<style>
+  :root{ --ink:#0d1220; --panel:#18203a; --panel2:#222c4e; --paper:#eaf0ff;
+         --green:#39c26a; --red:#ef4d5a; --yellow:#f7c33a; --blue:#3aa0ee; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ink);color:var(--paper);
+       font-family:"Verdana","Segoe UI",system-ui,sans-serif;font-size:15px}
+  header{padding:14px 20px;border-bottom:2px solid #2b3557;display:flex;
+         align-items:baseline;gap:14px;flex-wrap:wrap}
+  h1{font-size:20px;margin:0;letter-spacing:1px}
+  header p{margin:0;opacity:.6;font-size:13px}
+  .wrap{display:flex;gap:18px;padding:18px;align-items:flex-start;flex-wrap:wrap}
+  .stage{background:linear-gradient(#26304f,#3c4870);border-radius:16px;
+         border:3px solid #2b3557;position:relative;flex:1 1 460px;min-width:320px}
+  canvas{display:block;width:100%;height:auto;border-radius:13px}
+  .side{flex:0 0 330px;display:flex;flex-direction:column;gap:14px;min-width:290px}
+  .card{background:var(--panel);border:2px solid #2b3557;border-radius:14px;padding:12px 14px}
+  .card h2{margin:0 0 10px;font-size:14px;letter-spacing:2px;opacity:.75;text-transform:uppercase}
+  label{display:flex;align-items:center;gap:8px;margin:7px 0;font-size:14px}
+  select,input[type=range]{flex:1}
+  select{background:var(--panel2);color:var(--paper);border:2px solid #38456f;
+         border-radius:8px;padding:6px 8px;font-family:inherit;font-size:14px}
+  .parts{list-style:none;margin:0;padding:0;font-size:13px}
+  .parts li{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:7px}
+  .parts li+li{margin-top:2px}
+  .parts .ok{background:rgba(57,194,106,.14)}
+  .parts .missing{background:rgba(239,77,90,.10);opacity:.75}
+  .parts code{font-family:Consolas,monospace;font-size:12px;opacity:.85;
+              overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+  .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+  .ok .dot{background:var(--green)} .missing .dot{background:var(--red)}
+  .hint{font-size:12.5px;line-height:1.55;opacity:.72;margin:8px 0 0}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  button{font-family:inherit;font-weight:bold;font-size:13px;cursor:pointer;
+         background:var(--panel2);color:var(--paper);border:2px solid #38456f;
+         border-radius:9px;padding:7px 12px}
+  button.on{background:var(--green);border-color:var(--green);color:#042a12}
+  .lvl{display:grid;grid-template-columns:auto 1fr auto;gap:6px 9px;align-items:center;font-size:13px}
+  .lvl input{width:100%}
+  a{color:var(--blue)}
+</style>
+</head>
+<body>
+<header>
+  <h1>&#129302; Figurtest</h1>
+  <p>Sjekk at dine egne PNG-deler sitter riktig og beveger seg som de skal.</p>
+</header>
+
+<div class="wrap">
+  <div class="stage"><canvas id="c" width="900" height="620"></canvas></div>
+
+  <div class="side">
+    <div class="card">
+      <h2>Figur</h2>
+      <label><select id="fig"></select></label>
+      <div class="row">
+        <button id="bWalk" class="on">&#127939; Gaa</button>
+        <button id="bGrid">&#128207; Hjelpelinjer</button>
+        <button id="bPiv">&#128204; Dreiepunkt</button>
+      </div>
+      <label>Fart <input id="speed" type="range" min="0" max="200" value="100"></label>
+      <label>Stoerrelse <input id="size" type="range" min="120" max="560" value="380"></label>
+    </div>
+
+    <div class="card" id="upCard">
+      <h2>Oppgraderinger</h2>
+      <div class="lvl" id="upList"></div>
+    </div>
+
+    <div class="card">
+      <h2>Filer</h2>
+      <ul class="parts" id="parts"></ul>
+      <p class="hint" id="hint"></p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { setBase, setBust, drawRig, status, tex } from '../js/sprites.js';
+import { ROBOT_RIG, MONSTER_RIGS } from '../js/rigs.js';
+import { UPGRADES } from '../js/content.js';
+import * as art from '../js/art.js';
+
+setBase('../');            // art/ ligger ett hakk opp fra verktoy/
+setBust(true);             // hent alltid ferske filer mens du tegner
+
+const RIGS = Object.assign({ robot: ROBOT_RIG }, MONSTER_RIGS);
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+
+const state = { key: 'robot', walk: true, grid: false, piv: false, speed: 1, size: 380 };
+const up = {};
+UPGRADES.forEach(u => up[u.key] = 0);
+
+// --- menyer ---
+const figSel = document.getElementById('fig');
+Object.keys(RIGS).forEach(k => {
+  const o = document.createElement('option');
+  o.value = k; o.textContent = k;
+  figSel.appendChild(o);
+});
+figSel.onchange = () => { state.key = figSel.value; document.getElementById('upCard').style.display = state.key === 'robot' ? '' : 'none'; };
+
+const upList = document.getElementById('upList');
+UPGRADES.forEach(u => {
+  const name = document.createElement('span'); name.textContent = u.ico + ' ' + u.name;
+  const rng = document.createElement('input');
+  rng.type = 'range'; rng.min = 0; rng.max = 5; rng.value = 0;
+  const num = document.createElement('span'); num.textContent = '0';
+  rng.oninput = () => { up[u.key] = +rng.value; num.textContent = rng.value; };
+  upList.append(name, rng, num);
+});
+
+const toggle = (id, key) => {
+  const b = document.getElementById(id);
+  b.onclick = () => { state[key] = !state[key]; b.classList.toggle('on', state[key]); };
+};
+toggle('bWalk', 'walk'); toggle('bGrid', 'grid'); toggle('bPiv', 'piv');
+document.getElementById('speed').oninput = e => state.speed = e.target.value / 100;
+document.getElementById('size').oninput = e => state.size = +e.target.value;
+
+// --- tegning ---
+let t = 0, walk = 0;
+function frame(dt) {
+  t += dt;
+  if (state.walk) walk += dt * 7 * state.speed;
+
+  const rig = RIGS[state.key];
+  const W = c.width, H = c.height;
+  const groundY = H - 70;
+
+  ctx.clearRect(0, 0, W, H);
+
+  if (state.grid) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(255,255,255,.4)';
+    ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.stroke();
+    ctx.restore();
+  }
+
+  // bakke
+  ctx.fillStyle = '#2f3a5e';
+  ctx.fillRect(0, groundY, W, H - groundY);
+  ctx.strokeStyle = '#8fa3c7'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY); ctx.stroke();
+
+  const s = {
+    x: W / 2, y: groundY, h: state.size,
+    facing: 1, walk, move: state.walk ? 1 : 0, t, seed: 1,
+    aim: 0, recoil: 0, smash: 0, variants: up,
+  };
+
+  const drew = drawRig(ctx, rig, s);
+  if (!drew) {
+    // ingen PNG-er - vis spillets egen tegning i stedet
+    if (state.key === 'robot') {
+      art.drawRobot(ctx, s.x, s.y, s.h, { up, facing: 1, walk, moving: state.walk, onGround: true, t });
+    } else {
+      const w = state.size * 0.9;
+      art.drawCreature(ctx, {
+        x: s.x - w / 2, y: s.y - state.size, w, h: state.size,
+        key: state.key, facing: 1, seed: 1, hurtT: 0, boss: false,
+        def: { body: '#5fd36a', dark: '#2f8f44' },
+      }, t);
+    }
+    ctx.fillStyle = '#ffd36b';
+    ctx.font = 'bold 16px Verdana';
+    ctx.textAlign = 'center';
+    ctx.fillText('Ingen PNG funnet - viser spillets egen tegning', W / 2, 30);
+  }
+
+  if (state.piv) drawPivots(rig, s);
+  updateList(rig);
+}
+
+function drawPivots(rig, s) {
+  const bodyImg = tex(rig.mappe + '/kropp.png');
+  if (!bodyImg) return;
+  const boxH = s.h * (rig.fyll ?? 1);
+  const boxW = boxH * (bodyImg.naturalWidth / bodyImg.naturalHeight);
+  const DEF = {
+    'kropp': [0.50, 0.50], 'hode': [0.50, 0.42], 'arm-bak': [0.50, 0.42],
+    'arm-fram': [0.50, 0.42], 'bein-bak': [0.50, 0.58], 'bein-fram': [0.50, 0.58],
+    'vinge-bak': [0.50, 0.42], 'vinge-fram': [0.50, 0.42], 'hale': [0.42, 0.62],
+    'vapen': [0.50, 0.42], 'rygg': [0.50, 0.46],
+  };
+  ctx.save();
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+  ctx.strokeRect(s.x - boxW / 2, s.y - boxH, boxW, boxH);
+  const seen = new Set();
+  rig.deler.forEach(p => {
+    const pv = p.dreiepunkt || DEF[p.navn] || [0.5, 0.5];
+    const k = pv.join(',');
+    if (seen.has(k)) return;
+    seen.add(k);
+    const x = s.x + (pv[0] - 0.5) * boxW;
+    const y = s.y + (pv[1] - 1) * boxH;
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2);
+    ctx.fillStyle = '#f7c33a'; ctx.fill();
+    ctx.strokeStyle = '#141a2e'; ctx.lineWidth = 2; ctx.stroke();
+  });
+  ctx.restore();
+}
+
+let lastKey = '';
+function updateList(rig) {
+  const sig = state.key + JSON.stringify(up);
+  const ul = document.getElementById('parts');
+  const stats = rig.deler.map(p => {
+    let file = rig.mappe + '/' + p.navn + '.png';
+    const v = rig.variant && rig.variant[p.navn];
+    if (v && up[v]) {
+      for (let i = up[v]; i >= 1; i--) {
+        const cand = rig.mappe + '/' + p.navn + '-' + v + i + '.png';
+        if (status(cand) === 'ok') { file = cand; break; }
+      }
+    }
+    return { navn: p.navn, file, ok: status(file) === 'ok' };
+  });
+  const key = sig + stats.map(s => s.ok).join('');
+  if (key === lastKey) return;
+  lastKey = key;
+
+  ul.innerHTML = '';
+  stats.forEach(s => {
+    const li = document.createElement('li');
+    li.className = s.ok ? 'ok' : 'missing';
+    li.innerHTML = '<span class="dot"></span><b>' + s.navn + '</b><code>' + s.file + '</code>';
+    ul.appendChild(li);
+  });
+  const missing = stats.filter(s => !s.ok).length;
+  document.getElementById('hint').textContent = missing === 0
+    ? 'Alle delene er paa plass.'
+    : missing + ' av ' + stats.length + ' deler mangler. Lag dem med akkurat disse filnavnene, '
+      + 'eller la dem vaere - figuren tegnes uten dem.';
+}
+
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  frame(dt);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+window.figFrame = frame;   // saa man kan steppe manuelt ved testing
+</script>
+</body>
+</html>

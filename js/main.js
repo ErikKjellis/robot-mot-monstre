@@ -2,7 +2,7 @@
 
 import { sound, setupInput, clearInput, store, pick } from './core.js';
 import { LEVELS } from './content.js';
-import { Game } from './game.js';
+import { Game, preloadFigures } from './game.js';
 import {
   el, showScreen, showLayer, updateHud, resetHudCache,
   buildShop, refreshShop, drawPreviews, renderScores, saveScore,
@@ -146,6 +146,7 @@ window.addEventListener('pointerdown', () => sound.unlock(), { once: true });
 // ---------------------------------------------------------------
 setupInput(document);
 setSoundIcons();
+preloadFigures();   // ser etter egne PNG-figurer i art/-mappa
 
 function fit() {
   game.resize();

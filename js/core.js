@@ -138,6 +138,8 @@ class Sound {
   heart() { this.tone(660, 0.09, { v: 0.2, type: 'triangle' }); this.tone(880, 0.09, { v: 0.2, type: 'triangle', t0: 0.08 }); this.tone(1320, 0.16, { v: 0.2, type: 'triangle', t0: 0.16 }); }
   buy() { this.tone(523, 0.08, { v: 0.2 }); this.tone(784, 0.08, { v: 0.2, t0: 0.07 }); this.tone(1046, 0.14, { v: 0.2, t0: 0.14 }); }
   nope() { this.tone(180, 0.14, { to: 120, v: 0.18, type: 'sawtooth' }); }
+  laser() { this.tone(1600, 0.18, { to: 380, v: 0.16, type: 'sawtooth' }); this.noise(0.12, { f: 2600, v: 0.1 }); }
+  smash() { this.tone(160, 0.22, { to: 55, v: 0.26, type: 'square' }); this.noise(0.2, { f: 420, v: 0.22 }); }
   boss() { this.tone(120, 0.7, { to: 60, v: 0.3, type: 'sawtooth' }); this.noise(0.6, { f: 240, v: 0.2 }); }
   win() { [523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.28, { v: 0.22, type: 'triangle', t0: i * 0.11 })); }
   lose() { [440, 349, 262, 196].forEach((f, i) => this.tone(f, 0.34, { v: 0.24, type: 'sawtooth', t0: i * 0.16 })); }

@@ -1,5 +1,8 @@
-// art.js - all tegning. Ingen bildefiler: alt tegnes med former,
-// slik at spillet laster paa et blunk og alltid er skarpt.
+// art.js - spillets innebygde strektegning.
+//
+// Dette er RESERVELOESNINGEN: har du lagt inn egne PNG-figurer i art/-mappa
+// brukes de i stedet (se js/sprites.js og art/LES-MEG.md). Ingen bildefiler
+// trengs for at spillet skal se ferdig ut.
 
 import { TAU, clamp } from './core.js';
 
@@ -33,10 +36,18 @@ function ell(ctx, x, y, rx, ry, fill, stroke, lw) {
   if (stroke && lw) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
 }
 
+function poly(ctx, pts, fill, stroke, lw) {
+  ctx.beginPath();
+  pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+  ctx.closePath();
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke && lw) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+}
+
 function shadow(ctx, x, y, rx, a) {
   ctx.save();
   ctx.globalAlpha = a == null ? 0.25 : a;
-  ell(ctx, x, y, rx, rx * 0.26, '#000');
+  ell(ctx, x, y, rx, rx * 0.24, '#000');
   ctx.restore();
 }
 
@@ -45,6 +56,7 @@ const h2 = (i) => { const x = Math.sin(i * 311.7 + 7.3) * 24634.6345; return x -
 
 // ==================================================================
 //  ROBOTEN
+//  Starter som en liten enkel boks og bygges ut for hver oppgradering.
 // ==================================================================
 const M_LIGHT = '#cfdcf2';
 const M_MAIN = '#93a7c7';
@@ -52,24 +64,26 @@ const M_DARK = '#5d6f91';
 const GOLD = '#f7c33a';
 const GOLD_D = '#b98708';
 const VISOR = '#5ee6ff';
+const LASER_RED = '#ff4d6d';
 
-/**
- * Tegner roboten. Den ser stoerre og gjevere ut jo mer du har kjoept -
- * det er hele poenget med "hvor mye er roboten verdt".
- * cx = midten, by = under foettene, h = hoeyde.
- */
 export function drawRobot(ctx, cx, by, h, o = {}) {
   const up = o.up || {};
+  const kanon = up.kanon | 0, laser = up.laser | 0, hammer = up.hammer | 0;
+  const bein = up.bein | 0, panser = up.panser | 0, jet = up.jet | 0;
+  const total = kanon + laser + hammer + bein + panser + jet;
+
   const f = o.facing >= 0 ? 1 : -1;
   const lw = Math.max(2, h * 0.026);
-  const tier = (up.dmg || 0) + (up.rate || 0) + (up.speed || 0) + (up.hp || 0) + (up.shield || 0) + (up.magnet || 0);
-  const gold = tier >= 6;
-  const gold2 = tier >= 14;
   const main = o.flash ? '#ffffff' : M_MAIN;
   const dark = o.flash ? '#e6ecff' : M_DARK;
+  const gold = total >= 10;
 
-  const legH = h * 0.26, bodyH = h * 0.40, headH = h * 0.28;
-  const bodyW = h * 0.62, headW = h * 0.50;
+  const legH = h * (0.26 + bein * 0.008);
+  const bodyH = h * 0.40;
+  const headH = h * 0.26;
+  const bodyW = h * (0.54 + panser * 0.022);
+  const headW = h * (0.42 + laser * 0.012);
+
   const walk = o.walk || 0;
   const moving = !!o.moving;
   const air = !o.onGround;
@@ -78,109 +92,153 @@ export function drawRobot(ctx, cx, by, h, o = {}) {
 
   ctx.save();
   ctx.translate(cx, by);
-  if (o.shadow !== false) shadow(ctx, 0, 0, h * 0.34, air ? 0.14 : 0.26);
+  if (o.shadow !== false) shadow(ctx, 0, 0, h * 0.32, air ? 0.13 : 0.26);
   ctx.scale(f, 1);
   ctx.lineJoin = 'round';
 
   const bodyTop = -(legH + bodyH) - bob;
   const headTop = bodyTop - headH;
 
-  // --- bein ---
-  const legW = h * 0.15;
-  for (const s of [-1, 1]) {
-    const dx = s * h * 0.15;
-    const off = air ? (s > 0 ? -h * 0.05 : h * 0.03) : swing * h * 0.07 * s;
-    rr(ctx, dx - legW / 2 + off, -legH - bob, legW, legH + bob + h * 0.02, legW * 0.42, s > 0 ? main : dark, OUT, lw);
-    // fot
-    rr(ctx, dx - legW * 0.72 + off, -h * 0.045, legW * 1.45, h * 0.055, h * 0.02, dark, OUT, lw);
-  }
-
-  // --- jetflamme naar du har fartsoppgradering og er i lufta ---
-  if (air && (up.speed || 0) >= 2) {
-    const fl = h * (0.08 + 0.03 * Math.sin((o.t || 0) * 40));
-    for (const s of [-1, 1]) {
-      ctx.beginPath();
-      ctx.moveTo(s * h * 0.15 - h * 0.05, -h * 0.02);
-      ctx.lineTo(s * h * 0.15 + h * 0.05, -h * 0.02);
-      ctx.lineTo(s * h * 0.15, -h * 0.02 + fl);
-      ctx.closePath();
-      ctx.fillStyle = '#ffb347';
-      ctx.fill();
+  // ---------- JETPACK (rygg) ----------
+  if (jet > 0) {
+    const jw = h * (0.16 + jet * 0.012), jh = bodyH * (0.62 + jet * 0.03);
+    rr(ctx, -bodyW * 0.52 - jw * 0.55, bodyTop + bodyH * 0.12, jw, jh, h * 0.04, dark, OUT, lw);
+    rr(ctx, -bodyW * 0.52 - jw * 0.35, bodyTop + bodyH * 0.18, jw * 0.42, jh * 0.3, h * 0.02, GOLD);
+    if (air) {
+      const fl = h * (0.10 + 0.05 * Math.sin((o.t || 0) * 40)) * (0.7 + jet * 0.1);
+      poly(ctx, [
+        [-bodyW * 0.52 - jw * 0.55, bodyTop + bodyH * 0.12 + jh],
+        [-bodyW * 0.52 + jw * 0.45, bodyTop + bodyH * 0.12 + jh],
+        [-bodyW * 0.52 - jw * 0.05, bodyTop + bodyH * 0.12 + jh + fl],
+      ], '#ffb347');
+      poly(ctx, [
+        [-bodyW * 0.52 - jw * 0.3, bodyTop + bodyH * 0.12 + jh],
+        [-bodyW * 0.52 + jw * 0.2, bodyTop + bodyH * 0.12 + jh],
+        [-bodyW * 0.52 - jw * 0.05, bodyTop + bodyH * 0.12 + jh + fl * 0.55],
+      ], '#fff0b0');
     }
   }
 
-  // --- bakre arm ---
-  rr(ctx, -bodyW * 0.62, bodyTop + bodyH * 0.18, h * 0.12, bodyH * 0.55, h * 0.05, dark, OUT, lw);
-
-  // --- kropp ---
-  rr(ctx, -bodyW / 2, bodyTop, bodyW, bodyH, h * 0.09, main, OUT, lw);
-  rr(ctx, -bodyW / 2 + h * 0.035, bodyTop + h * 0.03, bodyW - h * 0.07, bodyH * 0.24, h * 0.04, M_LIGHT);
-  // brystplate - blir gull naar roboten er verdt mye
-  rr(ctx, -bodyW * 0.26, bodyTop + bodyH * 0.34, bodyW * 0.52, bodyH * 0.42, h * 0.035,
-    gold ? GOLD : dark, gold ? GOLD_D : OUT, lw * 0.8);
-  // panserplater = skadeoppgradering
-  for (let i = 0; i < (up.dmg || 0); i++) {
-    rr(ctx, -bodyW * 0.2 + i * (bodyW * 0.085), bodyTop + bodyH * 0.40, bodyW * 0.06, bodyH * 0.28, h * 0.012, gold2 ? '#fff0b0' : VISOR);
+  // ---------- BEIN ----------
+  const legW = h * (0.12 + bein * 0.011);
+  for (const s of [-1, 1]) {
+    const dx = s * h * 0.14;
+    const off = air ? (s > 0 ? -h * 0.05 : h * 0.03) : swing * h * 0.07 * s;
+    rr(ctx, dx - legW / 2 + off, -legH - bob, legW, legH + bob + h * 0.02, legW * 0.4, s > 0 ? main : dark, OUT, lw);
+    if (bein >= 2) { // knebeskytter
+      rr(ctx, dx - legW * 0.62 + off, -legH * 0.55 - bob, legW * 1.24, legH * 0.3, legW * 0.3, gold ? GOLD : M_LIGHT, OUT, lw * 0.7);
+    }
+    rr(ctx, dx - legW * 0.78 + off, -h * 0.045, legW * 1.56, h * 0.055, h * 0.02, dark, OUT, lw);
   }
 
-  // --- kanonarm ---
-  const barrel = h * (0.30 + 0.035 * (up.dmg || 0));
-  const bRad = h * (0.075 + 0.008 * (up.dmg || 0));
-  const armY = bodyTop + bodyH * 0.42;
-  rr(ctx, bodyW * 0.26, armY - h * 0.02, h * 0.16, h * 0.13, h * 0.05, main, OUT, lw);
-  rr(ctx, bodyW * 0.34, armY - bRad / 2, barrel, bRad, bRad * 0.42, gold ? GOLD : dark, OUT, lw);
-  rr(ctx, bodyW * 0.34 + barrel - h * 0.04, armY - bRad * 0.62, h * 0.05, bRad * 1.24, h * 0.02, M_LIGHT, OUT, lw * 0.8);
-  if (o.flashShot > 0) {
-    const r = h * 0.1 * o.flashShot;
-    circ(ctx, bodyW * 0.34 + barrel + r * 0.4, armY, r, '#fff6c0');
-    circ(ctx, bodyW * 0.34 + barrel + r * 0.4, armY, r * 0.55, '#ffffff');
+  // ---------- BAKARM / HAMMER ----------
+  const armY = bodyTop + bodyH * 0.34;
+  const smash = o.smash || 0;
+  ctx.save();
+  ctx.translate(-bodyW * 0.46, armY);
+  ctx.rotate(-smash * 2.2);
+  rr(ctx, -h * 0.055, 0, h * 0.11, bodyH * 0.52, h * 0.05, dark, OUT, lw);
+  if (hammer > 0) {
+    const hw = h * (0.13 + hammer * 0.028), hh = h * (0.09 + hammer * 0.018);
+    const hy = bodyH * 0.52;
+    rr(ctx, -h * 0.03, hy - h * 0.02, h * 0.06, h * 0.10, h * 0.02, '#8a5a2b', OUT, lw * 0.8);
+    rr(ctx, -hw / 2, hy + h * 0.06, hw, hh, h * 0.02, hammer >= 3 ? GOLD : '#b8c2d4', OUT, lw);
+    rr(ctx, -hw / 2 + hw * 0.08, hy + h * 0.075, hw * 0.24, hh * 0.5, h * 0.01, M_LIGHT);
+  }
+  ctx.restore();
+
+  // ---------- KROPP ----------
+  rr(ctx, -bodyW / 2, bodyTop, bodyW, bodyH, h * 0.08, main, OUT, lw);
+  rr(ctx, -bodyW / 2 + h * 0.03, bodyTop + h * 0.025, bodyW - h * 0.06, bodyH * 0.22, h * 0.035, M_LIGHT);
+  if (panser > 0) {
+    // brystplate
+    rr(ctx, -bodyW * 0.28, bodyTop + bodyH * 0.32, bodyW * 0.56, bodyH * 0.44, h * 0.03,
+      gold ? GOLD : dark, gold ? GOLD_D : OUT, lw * 0.8);
+    // skulderplater
+    for (const s of [-1, 1]) {
+      const pw = h * (0.10 + panser * 0.022);
+      rr(ctx, s * bodyW * 0.5 - pw / 2, bodyTop - h * 0.015, pw, h * (0.08 + panser * 0.014), h * 0.03,
+        gold ? GOLD : M_LIGHT, OUT, lw * 0.8);
+    }
+    for (let i = 0; i < panser; i++) {
+      rr(ctx, -bodyW * 0.2 + i * (bodyW * 0.09), bodyTop + bodyH * 0.40, bodyW * 0.055, bodyH * 0.26, h * 0.01, VISOR);
+    }
   }
 
-  // --- hode ---
-  rr(ctx, -headW / 2, headTop, headW, headH, h * 0.07, main, OUT, lw);
-  rr(ctx, -headW / 2 + h * 0.03, headTop + h * 0.025, headW - h * 0.06, headH * 0.22, h * 0.03, M_LIGHT);
-  // visir
-  const eyeGlow = o.flash ? '#ff6b6b' : VISOR;
-  rr(ctx, -headW * 0.34, headTop + headH * 0.36, headW * 0.78, headH * 0.34, h * 0.02, '#16233c', OUT, lw * 0.7);
-  rr(ctx, -headW * 0.22, headTop + headH * 0.42, headW * 0.30, headH * 0.22, h * 0.012, eyeGlow);
-  rr(ctx, headW * 0.16, headTop + headH * 0.42, headW * 0.18, headH * 0.22, h * 0.012, eyeGlow);
-  // oere
-  rr(ctx, headW * 0.44, headTop + headH * 0.42, h * 0.05, headH * 0.3, h * 0.02, dark, OUT, lw * 0.8);
+  // ---------- KANONARM ----------
+  ctx.save();
+  ctx.translate(bodyW * 0.3, armY + bodyH * 0.1);
+  ctx.rotate((o.aim || 0) * 0.4 - (o.flashShot || 0) * 0.3);
+  rr(ctx, -h * 0.05, -h * 0.06, h * 0.14, h * 0.13, h * 0.05, main, OUT, lw);
+  if (kanon > 0) {
+    const barrel = h * (0.22 + 0.048 * kanon);
+    const bRad = h * (0.07 + 0.013 * kanon);
+    rr(ctx, h * 0.05, -bRad / 2, barrel, bRad, bRad * 0.4, gold ? GOLD : dark, OUT, lw);
+    rr(ctx, h * 0.05 + barrel - h * 0.035, -bRad * 0.66, h * 0.045, bRad * 1.32, h * 0.018, M_LIGHT, OUT, lw * 0.7);
+    if (kanon >= 3) rr(ctx, h * 0.09, -bRad * 0.85, barrel * 0.4, bRad * 0.3, h * 0.012, VISOR);
+    if (o.flashShot > 0) {
+      const r = h * 0.11 * o.flashShot;
+      circ(ctx, h * 0.05 + barrel + r * 0.4, 0, r, '#fff6c0');
+      circ(ctx, h * 0.05 + barrel + r * 0.4, 0, r * 0.55, '#ffffff');
+    }
+  } else {
+    // helt enkel klo foer du kjoeper kanon
+    rr(ctx, h * 0.05, -h * 0.035, h * 0.10, h * 0.07, h * 0.03, dark, OUT, lw);
+  }
+  ctx.restore();
 
-  // --- antenne ---
-  ctx.strokeStyle = OUT; ctx.lineWidth = lw;
-  ctx.beginPath(); ctx.moveTo(-headW * 0.12, headTop); ctx.lineTo(-headW * 0.2, headTop - h * 0.1); ctx.stroke();
-  circ(ctx, -headW * 0.2, headTop - h * 0.12, h * 0.035, ((o.t || 0) % 1) < 0.5 ? '#ff6b6b' : '#ffd7d7', OUT, lw * 0.7);
+  // ---------- HODE ----------
+  rr(ctx, -headW / 2, headTop, headW, headH, h * 0.06, main, OUT, lw);
+  rr(ctx, -headW / 2 + h * 0.025, headTop + h * 0.02, headW - h * 0.05, headH * 0.2, h * 0.025, M_LIGHT);
+  rr(ctx, -headW * 0.36, headTop + headH * 0.34, headW * 0.8, headH * 0.36, h * 0.018, '#16233c', OUT, lw * 0.7);
 
-  // --- hjerteteller over hodet er i HUD, men vi viser magnetringen her ---
-  if ((up.magnet || 0) >= 3) {
+  if (laser > 0) {
+    // laseroeyne - lyser roedt og lader opp
+    const glow = 0.55 + 0.45 * Math.sin((o.t || 0) * 5);
     ctx.save();
-    ctx.globalAlpha = 0.35;
-    circ(ctx, 0, bodyTop + bodyH * 0.5, h * 0.52, null, VISOR, lw * 0.8);
+    ctx.globalAlpha = 0.35 * glow;
+    circ(ctx, headW * 0.06, headTop + headH * 0.52, h * (0.05 + laser * 0.008), LASER_RED);
     ctx.restore();
+    rr(ctx, -headW * 0.2, headTop + headH * 0.4, headW * 0.26, headH * 0.2, h * 0.01, LASER_RED);
+    rr(ctx, headW * 0.12, headTop + headH * 0.4, headW * (0.16 + laser * 0.02), headH * 0.2, h * 0.01, LASER_RED);
+    if (laser >= 3) { // sikteantenne
+      ctx.strokeStyle = OUT; ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.moveTo(headW * 0.2, headTop); ctx.lineTo(headW * 0.34, headTop - h * 0.09); ctx.stroke();
+      circ(ctx, headW * 0.34, headTop - h * 0.1, h * 0.028, LASER_RED, OUT, lw * 0.6);
+    }
+  } else {
+    rr(ctx, -headW * 0.2, headTop + headH * 0.4, headW * 0.26, headH * 0.2, h * 0.01, VISOR);
+    rr(ctx, headW * 0.14, headTop + headH * 0.4, headW * 0.16, headH * 0.2, h * 0.01, VISOR);
   }
+  rr(ctx, headW * 0.46, headTop + headH * 0.38, h * 0.045, headH * 0.3, h * 0.018, dark, OUT, lw * 0.8);
+
+  // antenne med blinkende lys
+  ctx.strokeStyle = OUT; ctx.lineWidth = lw;
+  ctx.beginPath(); ctx.moveTo(-headW * 0.14, headTop); ctx.lineTo(-headW * 0.22, headTop - h * 0.09); ctx.stroke();
+  circ(ctx, -headW * 0.22, headTop - h * 0.11, h * 0.032, ((o.t || 0) % 1) < 0.5 ? '#ff6b6b' : '#ffd7d7', OUT, lw * 0.7);
 
   ctx.restore();
 
-  // --- skjoldboble (utenfor speiling saa den alltid er rund) ---
+  // skjoldboble utenfor speilingen, saa den alltid er rund
   if (o.shieldOn) {
     ctx.save();
-    ctx.globalAlpha = 0.28 + 0.1 * Math.sin((o.t || 0) * 8);
+    ctx.globalAlpha = 0.13 + 0.05 * Math.sin((o.t || 0) * 8);
     circ(ctx, cx, by - h * 0.5, h * 0.62, '#7fe8ff');
-    ctx.globalAlpha = 0.85;
-    circ(ctx, cx, by - h * 0.5, h * 0.62, null, '#bff4ff', Math.max(2, h * 0.03));
+    ctx.globalAlpha = 0.6;
+    circ(ctx, cx, by - h * 0.5, h * 0.62, null, '#bff4ff', Math.max(2, h * 0.028));
     ctx.restore();
   }
 }
 
-/** Tegner roboten pent sentrert i et lite lerret (brukes i menyen og butikken). */
+/** Robotens hodehoeyde over bakken - der laserstraalen starter. */
+export function robotEyeY(h) { return -(h * 0.26 + h * 0.40 + h * 0.13); }
+
 export function renderBotPreview(canvas, up, t) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
-  const h = H * 0.82;
-  drawRobot(ctx, W / 2, H - H * 0.07, h, {
-    up, facing: 1, t, onGround: true, moving: false, shadow: true,
+  drawRobot(ctx, W / 2, H - H * 0.06, H * 0.84, {
+    up, facing: 1, t, onGround: true, moving: false,
   });
 }
 
@@ -188,219 +246,205 @@ export function renderBotPreview(canvas, up, t) {
 //  MONSTRE
 // ==================================================================
 const SHAPE = {
-  slim: 'blob', edder: 'spider', flagg: 'bat', oye: 'eye', stein: 'rock', trollm: 'wizard',
-  slimking: 'blob', edderdron: 'spider', flaggkon: 'bat', steinkje: 'rock', trollmes: 'wizard', megamon: 'brute',
+  smaadrage: 'drage', ildoegle: 'oegle', flygedrage: 'flyger',
+  isoegle: 'oegle', steintroll: 'troll', skyggedrage: 'flyger',
+  godzaur: 'drage', roddrage: 'flyger', hydra: 'hydra',
+  frostdragen: 'flyger', kolossen: 'koloss', kongedragen: 'drage',
 };
 
-function eyes(ctx, x, y, r, look, angry, color) {
-  circ(ctx, x, y, r, '#ffffff', OUT, r * 0.35);
-  circ(ctx, x + look * r * 0.35, y + r * 0.1, r * 0.45, color || '#1b2340');
+function eye(ctx, x, y, r, look, angry, color) {
+  circ(ctx, x, y, r, '#ffffff', OUT, r * 0.34);
+  circ(ctx, x + look * r * 0.32, y + r * 0.08, r * 0.46, color || '#1b2340');
   if (angry) {
     ctx.strokeStyle = OUT;
-    ctx.lineWidth = r * 0.5;
+    ctx.lineWidth = r * 0.55;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(x - r * 1.1, y - r * 1.25);
-    ctx.lineTo(x + r * 0.9, y - r * 0.55);
+    ctx.moveTo(x - r * 1.15, y - r * 1.3);
+    ctx.lineTo(x + r * 0.95, y - r * 0.5);
     ctx.stroke();
     ctx.lineCap = 'butt';
   }
 }
 
-/**
- * Tegner et monster. e = { x,y,w,h,key,facing,seed,hurtT,def }
- */
+/** Ryggpigger langs en linje - gir dragene silhuetten sin. */
+function spikes(ctx, x0, y0, x1, y1, n, size, color) {
+  for (let i = 0; i < n; i++) {
+    const t0 = i / n, t1 = (i + 0.7) / n;
+    const ax = x0 + (x1 - x0) * t0, ay = y0 + (y1 - y0) * t0;
+    const bx = x0 + (x1 - x0) * t1, by2 = y0 + (y1 - y0) * t1;
+    const mx = (ax + bx) / 2, my = (ay + by2) / 2;
+    const s = size * (0.6 + Math.sin(t0 * Math.PI) * 0.7);
+    poly(ctx, [[ax, ay], [bx, by2], [mx, my - s]], color, OUT, size * 0.22);
+  }
+}
+
+function tail(ctx, x, y, len, thick, dir, wag, color, lwv) {
+  ctx.beginPath();
+  ctx.moveTo(x, y - thick);
+  ctx.quadraticCurveTo(x + dir * len * 0.6, y - thick * 0.4 + wag, x + dir * len, y - thick * 0.1 + wag * 1.6);
+  ctx.quadraticCurveTo(x + dir * len * 0.6, y + thick * 0.5 + wag, x, y + thick);
+  ctx.closePath();
+  ctx.fillStyle = color; ctx.fill();
+  ctx.strokeStyle = OUT; ctx.lineWidth = lwv; ctx.stroke();
+}
+
+/** e = { x,y,w,h,key,facing,seed,hurtT,def,boss } */
 export function drawCreature(ctx, e, t) {
   const d = e.def;
-  const shape = SHAPE[e.key] || 'blob';
+  const shape = SHAPE[e.key] || 'drage';
   const flash = e.hurtT > 0 && Math.floor(e.hurtT * 30) % 2 === 0;
   const body = flash ? '#ffffff' : d.body;
   const dark = flash ? '#d8dcea' : d.dark;
   const x = e.x, y = e.y, w = e.w, h = e.h;
   const cx = x + w / 2, cy = y + h / 2, by = y + h;
-  const lw = Math.max(2, h * 0.055);
+  const lw = Math.max(2, h * 0.045);
   const look = e.facing >= 0 ? 1 : -1;
-  const wob = Math.sin(t * 5 + (e.seed || 0));
+  const wob = Math.sin(t * 4 + (e.seed || 0));
+  const step = Math.sin(t * 7 + (e.seed || 0));
   const big = !!e.boss;
 
   ctx.save();
   ctx.lineJoin = 'round';
-  if (shape !== 'bat' && shape !== 'eye') shadow(ctx, cx, by + 2, w * 0.45, 0.22);
+  // speil alt om monsteret ser mot venstre
+  ctx.translate(cx, by);
+  ctx.scale(look, 1);
+  ctx.translate(-cx, -by);
+  const bx = cx; // alt under tegnes som om monsteret ser mot hoeyre
 
-  if (shape === 'blob') {
-    const sq = 1 + wob * 0.06, sy = 1 / sq;
-    const bw = w * sq, bh = h * sy;
-    rr(ctx, cx - bw / 2, by - bh, bw, bh, bh * 0.45, body, OUT, lw);
-    // lys topp
-    ctx.save(); ctx.globalAlpha = 0.35;
-    ell(ctx, cx - bw * 0.14, by - bh * 0.72, bw * 0.22, bh * 0.16, '#ffffff');
+  if (shape !== 'flyger') shadow(ctx, bx, by + 2, w * 0.44, 0.22);
+
+  if (shape === 'drage') {
+    // ---- tobeint kjempeoegle (godzilla-typen) ----
+    tail(ctx, bx - w * 0.22, by - h * 0.42, w * 0.62, h * 0.11, -1, wob * h * 0.05, dark, lw);
+    // bakbein
+    rr(ctx, bx - w * 0.2 + step * w * 0.05, by - h * 0.34, w * 0.19, h * 0.34, h * 0.06, dark, OUT, lw);
+    // kropp
+    ell(ctx, bx, by - h * 0.5, w * 0.3, h * 0.29, body, OUT, lw);
+    rr(ctx, bx - w * 0.22, by - h * 0.62, w * 0.44, h * 0.34, h * 0.12, body, OUT, lw);
+    ctx.save(); ctx.globalAlpha = 0.45;
+    ell(ctx, bx + w * 0.04, by - h * 0.44, w * 0.15, h * 0.13, dark); // mage
     ctx.restore();
-    eyes(ctx, cx - bw * 0.17, by - bh * 0.58, h * 0.1, look, big);
-    eyes(ctx, cx + bw * 0.17, by - bh * 0.58, h * 0.1, look, big);
-    // munn
-    ctx.strokeStyle = OUT; ctx.lineWidth = lw * 0.8; ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.arc(cx, by - bh * 0.3, w * 0.16, 0.15 * Math.PI, 0.85 * Math.PI);
-    ctx.stroke();
-    ctx.lineCap = 'butt';
-    if (d.crown) {
-      const cw = w * 0.5, chh = h * 0.2, ty = by - bh - chh * 0.5;
-      ctx.beginPath();
-      ctx.moveTo(cx - cw / 2, ty + chh);
-      ctx.lineTo(cx - cw / 2, ty);
-      ctx.lineTo(cx - cw * 0.25, ty + chh * 0.45);
-      ctx.lineTo(cx, ty - chh * 0.2);
-      ctx.lineTo(cx + cw * 0.25, ty + chh * 0.45);
-      ctx.lineTo(cx + cw / 2, ty);
-      ctx.lineTo(cx + cw / 2, ty + chh);
-      ctx.closePath();
-      ctx.fillStyle = GOLD; ctx.fill();
-      ctx.strokeStyle = OUT; ctx.lineWidth = lw * 0.8; ctx.stroke();
-    }
-  } else if (shape === 'spider') {
-    const n = d.legs || 6;
-    ctx.strokeStyle = dark; ctx.lineWidth = lw * 1.1; ctx.lineCap = 'round';
-    for (let i = 0; i < n; i++) {
-      const s = i < n / 2 ? -1 : 1;
-      const k = i % (n / 2);
-      const ph = Math.sin(t * 9 + i * 1.7 + (e.seed || 0)) * h * 0.12;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + s * w * (0.32 + k * 0.1), cy - h * 0.1 + ph * 0.4);
-      ctx.lineTo(cx + s * w * (0.48 + k * 0.12), by);
-      ctx.stroke();
-    }
-    ctx.lineCap = 'butt';
-    ell(ctx, cx - look * w * 0.1, cy, w * 0.34, h * 0.36, body, OUT, lw);
-    ell(ctx, cx + look * w * 0.22, cy + h * 0.04, w * 0.2, h * 0.24, dark, OUT, lw * 0.9);
-    const er = h * 0.085;
-    eyes(ctx, cx + look * w * 0.18, cy - h * 0.06, er, look, big, '#ff3b3b');
-    eyes(ctx, cx + look * w * 0.3, cy - h * 0.02, er * 0.8, look, false, '#ff3b3b');
-  } else if (shape === 'bat') {
-    const flap = Math.sin(t * 11 + (e.seed || 0));
-    const wy = cy - h * 0.1 + flap * h * 0.3;
-    for (const s of [-1, 1]) {
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.quadraticCurveTo(cx + s * w * 0.5, wy - h * 0.3, cx + s * w * 0.72, wy);
-      ctx.quadraticCurveTo(cx + s * w * 0.42, cy + h * 0.2, cx, cy + h * 0.22);
-      ctx.closePath();
-      ctx.fillStyle = dark; ctx.fill();
-      ctx.strokeStyle = OUT; ctx.lineWidth = lw * 0.9; ctx.stroke();
-    }
-    ell(ctx, cx, cy, w * 0.24, h * 0.34, body, OUT, lw);
-    // oerer
-    for (const s of [-1, 1]) {
-      ctx.beginPath();
-      ctx.moveTo(cx + s * w * 0.1, cy - h * 0.28);
-      ctx.lineTo(cx + s * w * 0.2, cy - h * 0.6);
-      ctx.lineTo(cx + s * w * 0.02, cy - h * 0.34);
-      ctx.closePath();
-      ctx.fillStyle = body; ctx.fill();
-      ctx.strokeStyle = OUT; ctx.lineWidth = lw * 0.8; ctx.stroke();
-    }
-    eyes(ctx, cx - w * 0.08, cy - h * 0.06, h * 0.1, look, big, '#ffd93d');
-    eyes(ctx, cx + w * 0.08, cy - h * 0.06, h * 0.1, look, big, '#ffd93d');
-    // hoggtenner
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.moveTo(cx - w * 0.07, cy + h * 0.14); ctx.lineTo(cx - w * 0.02, cy + h * 0.14); ctx.lineTo(cx - w * 0.045, cy + h * 0.26); ctx.closePath(); ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(cx + w * 0.02, cy + h * 0.14); ctx.lineTo(cx + w * 0.07, cy + h * 0.14); ctx.lineTo(cx + w * 0.045, cy + h * 0.26); ctx.closePath(); ctx.fill();
-  } else if (shape === 'eye') {
-    const fl = Math.sin(t * 2.4 + (e.seed || 0)) * h * 0.06;
-    ctx.save(); ctx.translate(0, fl);
-    ctx.strokeStyle = dark; ctx.lineWidth = lw;
-    ctx.lineCap = 'round';
-    for (let i = -2; i <= 2; i++) {
-      ctx.beginPath();
-      ctx.moveTo(cx + i * w * 0.14, cy + h * 0.2);
-      ctx.quadraticCurveTo(cx + i * w * 0.2, cy + h * 0.45, cx + i * w * 0.12 + Math.sin(t * 4 + i) * 5, cy + h * 0.6);
-      ctx.stroke();
-    }
-    ctx.lineCap = 'butt';
-    circ(ctx, cx, cy, w * 0.42, body, OUT, lw);
-    circ(ctx, cx, cy, w * 0.3, '#ffffff', OUT, lw * 0.6);
-    circ(ctx, cx + look * w * 0.11, cy, w * 0.14, '#1b2340');
-    circ(ctx, cx + look * w * 0.14, cy - w * 0.05, w * 0.05, '#ffffff');
-    ctx.restore();
-  } else if (shape === 'rock') {
-    const stomp = e.anim ? Math.abs(Math.sin(t * 4 + (e.seed || 0))) * h * 0.04 : 0;
-    ctx.save(); ctx.translate(0, stomp);
-    // bein
-    rr(ctx, cx - w * 0.3, by - h * 0.26, w * 0.24, h * 0.26, h * 0.05, dark, OUT, lw);
-    rr(ctx, cx + w * 0.06, by - h * 0.26, w * 0.24, h * 0.26, h * 0.05, dark, OUT, lw);
-    // kropp av steinblokker
-    rr(ctx, cx - w * 0.4, by - h * 0.88, w * 0.8, h * 0.64, h * 0.1, body, OUT, lw);
-    rr(ctx, cx - w * 0.3, by - h * 0.82, w * 0.26, h * 0.2, h * 0.04, dark);
-    rr(ctx, cx + w * 0.06, by - h * 0.56, w * 0.22, h * 0.18, h * 0.04, dark);
-    // armer
-    rr(ctx, cx - w * 0.56, by - h * 0.8, w * 0.2, h * 0.42, h * 0.07, body, OUT, lw);
-    rr(ctx, cx + w * 0.36, by - h * 0.8, w * 0.2, h * 0.42, h * 0.07, body, OUT, lw);
-    // hode
-    rr(ctx, cx - w * 0.26, by - h * 1.08, w * 0.52, h * 0.26, h * 0.07, body, OUT, lw);
-    circ(ctx, cx - w * 0.1, by - h * 0.95, h * 0.045, '#ff7a3d');
-    circ(ctx, cx + w * 0.1, by - h * 0.95, h * 0.045, '#ff7a3d');
-    ctx.restore();
-  } else if (shape === 'wizard') {
-    // kappe
-    ctx.beginPath();
-    ctx.moveTo(cx, by - h * 0.92);
-    ctx.quadraticCurveTo(cx - w * 0.6, by - h * 0.2, cx - w * 0.42, by);
-    ctx.lineTo(cx + w * 0.42, by);
-    ctx.quadraticCurveTo(cx + w * 0.6, by - h * 0.2, cx, by - h * 0.92);
-    ctx.closePath();
-    ctx.fillStyle = body; ctx.fill();
-    ctx.strokeStyle = OUT; ctx.lineWidth = lw; ctx.stroke();
-    // hette
-    ctx.beginPath();
-    ctx.moveTo(cx, by - h * 1.02);
-    ctx.quadraticCurveTo(cx - w * 0.34, by - h * 0.78, cx - w * 0.28, by - h * 0.52);
-    ctx.quadraticCurveTo(cx, by - h * 0.44, cx + w * 0.28, by - h * 0.52);
-    ctx.quadraticCurveTo(cx + w * 0.34, by - h * 0.78, cx, by - h * 1.02);
-    ctx.closePath();
-    ctx.fillStyle = dark; ctx.fill();
-    ctx.strokeStyle = OUT; ctx.lineWidth = lw; ctx.stroke();
-    // glodende oeyne i moerket
-    circ(ctx, cx - w * 0.1, by - h * 0.62, h * 0.04, '#ffe66d');
-    circ(ctx, cx + w * 0.1, by - h * 0.62, h * 0.04, '#ffe66d');
-    // stav
-    const sx = cx + look * w * 0.42;
-    ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = lw * 1.2; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(sx, by); ctx.lineTo(sx, by - h * 0.9); ctx.stroke();
-    ctx.lineCap = 'butt';
-    const pulse = 1 + Math.sin(t * 6 + (e.seed || 0)) * 0.15;
-    circ(ctx, sx, by - h * 0.95, h * 0.09 * pulse, '#ffe66d', '#ff9a3d', lw * 0.7);
-  } else if (shape === 'brute') {
-    // stor sjef: kropp + horn + klor
-    rr(ctx, cx - w * 0.34, by - h * 0.34, w * 0.26, h * 0.34, h * 0.06, dark, OUT, lw);
-    rr(ctx, cx + w * 0.08, by - h * 0.34, w * 0.26, h * 0.34, h * 0.06, dark, OUT, lw);
-    rr(ctx, cx - w * 0.44, by - h * 0.92, w * 0.88, h * 0.62, h * 0.16, body, OUT, lw);
-    rr(ctx, cx - w * 0.62, by - h * 0.86, w * 0.22, h * 0.5, h * 0.1, body, OUT, lw);
-    rr(ctx, cx + w * 0.4, by - h * 0.86, w * 0.22, h * 0.5, h * 0.1, body, OUT, lw);
-    ell(ctx, cx, by - h * 0.56, w * 0.24, h * 0.16, dark);
-    rr(ctx, cx - w * 0.3, by - h * 1.18, w * 0.6, h * 0.3, h * 0.1, body, OUT, lw);
-    for (const s of [-1, 1]) {
-      ctx.beginPath();
-      ctx.moveTo(cx + s * w * 0.24, by - h * 1.12);
-      ctx.quadraticCurveTo(cx + s * w * 0.52, by - h * 1.38, cx + s * w * 0.34, by - h * 1.5);
-      ctx.quadraticCurveTo(cx + s * w * 0.32, by - h * 1.22, cx + s * w * 0.16, by - h * 1.14);
-      ctx.closePath();
-      ctx.fillStyle = '#f2e6c8'; ctx.fill();
-      ctx.strokeStyle = OUT; ctx.lineWidth = lw * 0.8; ctx.stroke();
-    }
-    eyes(ctx, cx - w * 0.12, by - h * 1.03, h * 0.055, look, true, '#ffe66d');
-    eyes(ctx, cx + w * 0.12, by - h * 1.03, h * 0.055, look, true, '#ffe66d');
+    // ryggpigger
+    spikes(ctx, bx - w * 0.26, by - h * 0.66, bx + w * 0.12, by - h * 0.84, big ? 6 : 4, h * 0.1, dark);
+    // framlabber (smaa)
+    rr(ctx, bx + w * 0.12, by - h * 0.56, w * 0.1, h * 0.2, h * 0.05, body, OUT, lw * 0.9);
+    // forbein
+    rr(ctx, bx + w * 0.02 - step * w * 0.05, by - h * 0.32, w * 0.19, h * 0.32, h * 0.06, body, OUT, lw);
+    rr(ctx, bx + w * 0.0 - step * w * 0.05, by - h * 0.06, w * 0.26, h * 0.07, h * 0.03, dark, OUT, lw * 0.9);
+    // hode med snute
+    const hx = bx + w * 0.22, hy = by - h * 0.86;
+    rr(ctx, hx - w * 0.16, hy - h * 0.02, w * 0.3, h * 0.19, h * 0.06, body, OUT, lw);
+    rr(ctx, hx + w * 0.06, hy + h * 0.06, w * 0.22, h * 0.1, h * 0.035, body, OUT, lw);
     // tenner
     ctx.fillStyle = '#ffffff';
-    for (let i = -2; i <= 2; i++) {
+    for (let i = 0; i < 3; i++) {
+      poly(ctx, [
+        [hx + w * (0.1 + i * 0.05), hy + h * 0.14],
+        [hx + w * (0.13 + i * 0.05), hy + h * 0.14],
+        [hx + w * (0.115 + i * 0.05), hy + h * 0.2],
+      ], '#ffffff');
+    }
+    eye(ctx, hx + w * 0.03, hy + h * 0.06, h * 0.045, 1, big, '#ffe066');
+    // horn
+    poly(ctx, [[hx - w * 0.1, hy], [hx - w * 0.04, hy - h * 0.12], [hx + w * 0.0, hy + h * 0.01]], dark, OUT, lw * 0.8);
+  } else if (shape === 'oegle') {
+    // ---- firbeint oegle ----
+    tail(ctx, bx - w * 0.26, by - h * 0.4, w * 0.6, h * 0.09, -1, wob * h * 0.07, dark, lw);
+    for (let i = 0; i < 2; i++) {
+      const lx = bx - w * 0.22 + i * w * 0.38;
+      const ph = i ? -step : step;
+      rr(ctx, lx + ph * w * 0.04, by - h * 0.3, w * 0.12, h * 0.3, h * 0.05, dark, OUT, lw * 0.9);
+      rr(ctx, lx + w * 0.1 - ph * w * 0.04, by - h * 0.28, w * 0.12, h * 0.28, h * 0.05, body, OUT, lw * 0.9);
+    }
+    ell(ctx, bx, by - h * 0.54, w * 0.34, h * 0.22, body, OUT, lw);
+    spikes(ctx, bx - w * 0.28, by - h * 0.7, bx + w * 0.18, by - h * 0.72, 5, h * 0.09, dark);
+    const hx = bx + w * 0.32, hy = by - h * 0.6;
+    rr(ctx, hx - w * 0.1, hy - h * 0.02, w * 0.26, h * 0.2, h * 0.07, body, OUT, lw);
+    ctx.fillStyle = '#ffffff';
+    poly(ctx, [[hx + w * 0.06, hy + h * 0.16], [hx + w * 0.12, hy + h * 0.16], [hx + w * 0.09, hy + h * 0.23]], '#ffffff');
+    eye(ctx, hx + w * 0.06, hy + h * 0.06, h * 0.05, 1, big, '#ffd93d');
+  } else if (shape === 'flyger') {
+    // ---- flygende drage ----
+    const flap = Math.sin(t * (big ? 4.5 : 8) + (e.seed || 0));
+    for (const s of [-1, 1]) {
+      const up2 = flap * h * (s < 0 ? 0.3 : 0.42);
       ctx.beginPath();
-      ctx.moveTo(cx + i * w * 0.07 - w * 0.025, by - h * 0.94);
-      ctx.lineTo(cx + i * w * 0.07 + w * 0.025, by - h * 0.94);
-      ctx.lineTo(cx + i * w * 0.07, by - h * 0.86);
-      ctx.closePath(); ctx.fill();
+      ctx.moveTo(bx - w * 0.04, by - h * 0.56);
+      ctx.quadraticCurveTo(bx - w * 0.1, by - h * 0.95 - up2, bx - w * 0.46 * (s < 0 ? 1.1 : 0.85), by - h * 0.8 - up2);
+      ctx.quadraticCurveTo(bx - w * 0.3, by - h * 0.5 - up2 * 0.4, bx - w * 0.06, by - h * 0.44);
+      ctx.closePath();
+      ctx.fillStyle = s < 0 ? dark : body; ctx.fill();
+      ctx.strokeStyle = OUT; ctx.lineWidth = lw * 0.9; ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(bx + w * 0.04, by - h * 0.56);
+      ctx.quadraticCurveTo(bx + w * 0.2, by - h * 0.98 - up2, bx + w * 0.44 * (s < 0 ? 1.1 : 0.85), by - h * 0.78 - up2);
+      ctx.quadraticCurveTo(bx + w * 0.26, by - h * 0.48 - up2 * 0.4, bx + w * 0.06, by - h * 0.44);
+      ctx.closePath();
+      ctx.fillStyle = s < 0 ? dark : body; ctx.fill();
+      ctx.stroke();
+      if (s < 0) continue;
+    }
+    tail(ctx, bx - w * 0.14, by - h * 0.46, w * 0.5, h * 0.07, -1, wob * h * 0.08, dark, lw * 0.9);
+    ell(ctx, bx, by - h * 0.48, w * 0.17, h * 0.22, body, OUT, lw);
+    // bein som henger
+    rr(ctx, bx - w * 0.06, by - h * 0.32, w * 0.07, h * 0.18, h * 0.04, dark, OUT, lw * 0.8);
+    rr(ctx, bx + w * 0.04, by - h * 0.3, w * 0.07, h * 0.18, h * 0.04, dark, OUT, lw * 0.8);
+    // hals og hode
+    const hx = bx + w * 0.2, hy = by - h * 0.72;
+    ctx.beginPath();
+    ctx.moveTo(bx + w * 0.02, by - h * 0.56);
+    ctx.quadraticCurveTo(bx + w * 0.14, by - h * 0.74, hx, hy + h * 0.06);
+    ctx.lineWidth = h * 0.11; ctx.strokeStyle = body; ctx.lineCap = 'round'; ctx.stroke();
+    ctx.lineCap = 'butt';
+    rr(ctx, hx - w * 0.08, hy - h * 0.02, w * 0.2, h * 0.16, h * 0.05, body, OUT, lw);
+    rr(ctx, hx + w * 0.06, hy + h * 0.04, w * 0.14, h * 0.08, h * 0.03, body, OUT, lw * 0.9);
+    poly(ctx, [[hx - w * 0.05, hy], [hx - w * 0.01, hy - h * 0.13], [hx + w * 0.03, hy + h * 0.01]], dark, OUT, lw * 0.8);
+    eye(ctx, hx + w * 0.03, hy + h * 0.05, h * 0.04, 1, big, '#ffe066');
+  } else if (shape === 'troll' || shape === 'koloss') {
+    // ---- steintroll / koloss ----
+    const k = shape === 'koloss' ? 1.1 : 1;
+    const bobY = Math.abs(step) * h * 0.03;
+    ctx.save(); ctx.translate(0, bobY);
+    rr(ctx, bx - w * 0.3, by - h * 0.26, w * 0.24, h * 0.26, h * 0.05, dark, OUT, lw);
+    rr(ctx, bx + w * 0.06, by - h * 0.26, w * 0.24, h * 0.26, h * 0.05, dark, OUT, lw);
+    rr(ctx, bx - w * 0.38 * k, by - h * 0.86, w * 0.76 * k, h * 0.62, h * 0.14, body, OUT, lw);
+    // steinbiter
+    rr(ctx, bx - w * 0.28, by - h * 0.8, w * 0.22, h * 0.18, h * 0.04, dark);
+    rr(ctx, bx + w * 0.06, by - h * 0.56, w * 0.2, h * 0.16, h * 0.04, dark);
+    // armer
+    rr(ctx, bx - w * 0.56 * k, by - h * 0.8 + step * h * 0.03, w * 0.2, h * 0.44, h * 0.07, body, OUT, lw);
+    rr(ctx, bx + w * 0.36 * k, by - h * 0.8 - step * h * 0.03, w * 0.2, h * 0.44, h * 0.07, body, OUT, lw);
+    // hode
+    rr(ctx, bx - w * 0.22, by - h * 1.06, w * 0.44, h * 0.24, h * 0.06, body, OUT, lw);
+    if (big) {
+      poly(ctx, [[bx - w * 0.2, by - h * 1.04], [bx - w * 0.3, by - h * 1.26], [bx - w * 0.08, by - h * 1.08]], dark, OUT, lw * 0.8);
+      poly(ctx, [[bx + w * 0.2, by - h * 1.04], [bx + w * 0.3, by - h * 1.26], [bx + w * 0.08, by - h * 1.08]], dark, OUT, lw * 0.8);
+    }
+    circ(ctx, bx - w * 0.08, by - h * 0.94, h * 0.04, '#ff7a3d');
+    circ(ctx, bx + w * 0.09, by - h * 0.94, h * 0.04, '#ff7a3d');
+    ctx.restore();
+  } else if (shape === 'hydra') {
+    // ---- hydra med tre hoder ----
+    tail(ctx, bx - w * 0.24, by - h * 0.34, w * 0.5, h * 0.1, -1, wob * h * 0.05, dark, lw);
+    rr(ctx, bx - w * 0.22 + step * w * 0.04, by - h * 0.32, w * 0.2, h * 0.32, h * 0.06, dark, OUT, lw);
+    rr(ctx, bx + w * 0.04 - step * w * 0.04, by - h * 0.32, w * 0.2, h * 0.32, h * 0.06, body, OUT, lw);
+    ell(ctx, bx, by - h * 0.5, w * 0.3, h * 0.24, body, OUT, lw);
+    for (let i = -1; i <= 1; i++) {
+      const sway = Math.sin(t * 2.4 + i * 1.5 + (e.seed || 0)) * h * 0.05;
+      const nx = bx + w * 0.06 + i * w * 0.13;
+      const ny = by - h * 0.78 - Math.abs(i) * h * 0.06 + sway;
+      ctx.beginPath();
+      ctx.moveTo(bx + i * w * 0.08, by - h * 0.6);
+      ctx.quadraticCurveTo(nx - w * 0.04, ny + h * 0.14, nx, ny + h * 0.06);
+      ctx.lineWidth = h * 0.09; ctx.strokeStyle = i === 0 ? body : dark; ctx.lineCap = 'round'; ctx.stroke();
+      ctx.lineCap = 'butt';
+      rr(ctx, nx - w * 0.07, ny - h * 0.02, w * 0.17, h * 0.14, h * 0.045, i === 0 ? body : dark, OUT, lw * 0.9);
+      rr(ctx, nx + w * 0.05, ny + h * 0.03, w * 0.12, h * 0.07, h * 0.025, i === 0 ? body : dark, OUT, lw * 0.8);
+      eye(ctx, nx + w * 0.03, ny + h * 0.04, h * 0.035, 1, true, '#ffe066');
     }
   }
+
   ctx.restore();
 }
 
@@ -427,14 +471,12 @@ export function drawBackground(ctx, th, camX, W, H, t) {
     }
     ctx.restore();
   } else {
-    // sol / maane
     ctx.save();
     ctx.globalAlpha = 0.5;
-    circ(ctx, W * 0.78 - camX * 0.02, H * 0.2, H * 0.09, '#fff3c4');
+    circ(ctx, W * 0.78 - camX * 0.02, H * 0.18, H * 0.075, '#fff3c4');
     ctx.restore();
   }
 
-  // fjerne aaser
   const fo = camX * 0.18, fs = 300;
   ctx.fillStyle = th.far;
   let i0 = Math.floor(fo / fs) - 1;
@@ -444,44 +486,42 @@ export function drawBackground(ctx, th, camX, W, H, t) {
     ell(ctx, px, H * 0.82, r, H * (0.22 + h2(i) * 0.16));
   }
 
-  // naermere silhuetter
   const mo = camX * 0.42, ms = 200;
   ctx.fillStyle = th.mid;
   i0 = Math.floor(mo / ms) - 1;
   for (let i = i0; i < i0 + Math.ceil(W / ms) + 3; i++) {
     const px = i * ms - mo + h1(i * 7) * 70;
-    const hh = H * (0.16 + h2(i * 5) * 0.2);
-    midShape(ctx, px, H * 0.84, hh, th, i);
+    const hh = H * (0.16 + h2(i * 5) * 0.22);
+    midShape(ctx, px, H * 0.84, hh, th.form, i);
   }
 }
 
-function midShape(ctx, x, baseY, hh, th, i) {
+function midShape(ctx, x, baseY, hh, form, i) {
   const w = hh * (0.5 + h1(i * 3) * 0.4);
-  if (th === undefined) return;
-  const kind = th.stars ? 'rock' : th.accent === '#ffe27a' ? 'tree' : th.particle === '#ffffff' ? 'spike' : 'spike';
-  if (kind === 'tree') {
+  if (form === 'tre') {
     ctx.fillRect(x - w * 0.12, baseY - hh * 0.5, w * 0.24, hh * 0.5);
-    ctx.beginPath();
-    ctx.moveTo(x - w * 0.6, baseY - hh * 0.42);
-    ctx.lineTo(x, baseY - hh * 1.25);
-    ctx.lineTo(x + w * 0.6, baseY - hh * 0.42);
-    ctx.closePath();
+    poly(ctx, [[x - w * 0.6, baseY - hh * 0.42], [x, baseY - hh * 1.25], [x + w * 0.6, baseY - hh * 0.42]]);
     ctx.fill();
-  } else if (kind === 'rock') {
-    ctx.beginPath();
-    ctx.moveTo(x - w, baseY);
-    ctx.lineTo(x - w * 0.5, baseY - hh * 0.8);
-    ctx.lineTo(x + w * 0.2, baseY - hh);
-    ctx.lineTo(x + w, baseY - hh * 0.4);
-    ctx.lineTo(x + w * 1.1, baseY);
-    ctx.closePath();
+  } else if (form === 'hus') {
+    // by-silhuett: hoeyhus med vinduer
+    const bw = w * 1.1, bh = hh * (0.9 + h2(i * 11) * 0.7);
+    ctx.fillRect(x - bw / 2, baseY - bh, bw, bh);
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#ffe9a8';
+    for (let r = 0; r < Math.floor(bh / 26); r++) {
+      for (let c = 0; c < 3; c++) {
+        if (h1(i * 31 + r * 7 + c) < 0.45) continue;
+        ctx.fillRect(x - bw / 2 + 6 + c * (bw - 14) / 3, baseY - bh + 10 + r * 26, (bw - 20) / 4, 10);
+      }
+    }
+    ctx.restore();
+  } else if (form === 'fjell') {
+    poly(ctx, [[x - w, baseY], [x - w * 0.5, baseY - hh * 0.8], [x + w * 0.2, baseY - hh],
+      [x + w, baseY - hh * 0.4], [x + w * 1.1, baseY]]);
     ctx.fill();
   } else {
-    ctx.beginPath();
-    ctx.moveTo(x - w * 0.55, baseY);
-    ctx.lineTo(x, baseY - hh * 1.1);
-    ctx.lineTo(x + w * 0.55, baseY);
-    ctx.closePath();
+    poly(ctx, [[x - w * 0.55, baseY], [x, baseY - hh * 1.1], [x + w * 0.55, baseY]]);
     ctx.fill();
   }
 }
@@ -497,7 +537,6 @@ export function drawGround(ctx, th, camX, W, H, groundY) {
   ctx.moveTo(0, groundY + 2);
   ctx.lineTo(W, groundY + 2);
   ctx.stroke();
-  // litt tekstur
   ctx.save();
   ctx.globalAlpha = 0.22;
   ctx.fillStyle = OUT;
@@ -580,6 +619,36 @@ export function drawBullet(ctx, b) {
   }
 }
 
+/** Laserstraalen fra robotens oeyne. */
+export function drawLaser(ctx, l) {
+  const a = clamp(l.life / l.max, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a * 0.35;
+  ctx.strokeStyle = LASER_RED;
+  ctx.lineWidth = 18 * a;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(l.x0, l.y0); ctx.lineTo(l.x1, l.y1); ctx.stroke();
+  ctx.globalAlpha = a;
+  ctx.strokeStyle = '#fff0f3';
+  ctx.lineWidth = 6 * a;
+  ctx.beginPath(); ctx.moveTo(l.x0, l.y0); ctx.lineTo(l.x1, l.y1); ctx.stroke();
+  ctx.lineCap = 'butt';
+  ctx.restore();
+}
+
+/** Hammerslaget - en halvsirkel der det smeller. */
+export function drawSmash(ctx, s) {
+  const a = clamp(s.life / s.max, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = a * 0.8;
+  ctx.strokeStyle = '#ffe9a8';
+  ctx.lineWidth = 9 * a;
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, s.r * (1.5 - a * 0.5), -0.9, 0.9);
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function drawParticle(ctx, p) {
   ctx.save();
   ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
@@ -591,7 +660,6 @@ export function drawParticle(ctx, p) {
   ctx.restore();
 }
 
-/** Flytende "+5"-tall naar du plukker mynter. */
 export function drawFloatText(ctx, ft) {
   ctx.save();
   ctx.globalAlpha = clamp(ft.life / ft.max, 0, 1);

@@ -2,18 +2,20 @@
 // Vil du gjoere spillet lettere eller vanskeligere er det her du skrur.
 
 // ============================================================
-//  OPPGRADERINGER (butikken)
+//  OPPGRADERINGER
+//  Hver av dem bytter ut en synlig kroppsdel paa roboten, og
+//  roboten blir stoerre for hver eneste oppgradering du kjoeper.
 // ============================================================
 export const UPGRADES = [
-  { key: 'dmg',    ico: '\u{1F4A5}', name: 'SKADE',  prices: [15, 30, 55, 90, 140] },
-  { key: 'rate',   ico: '⚡',    name: 'SKYT',   prices: [12, 25, 45, 75, 120] },
-  { key: 'speed',  ico: '\u{1F45F}', name: 'FART',   prices: [10, 20, 35, 60, 95] },
-  { key: 'hp',     ico: '❤️', name: 'LIV', prices: [20, 40, 70, 110, 160] },
-  { key: 'shield', ico: '\u{1F6E1}️', name: 'SKJOLD', prices: [25, 45, 75, 115, 165] },
-  { key: 'magnet', ico: '\u{1F9F2}', name: 'MAGNET', prices: [8, 16, 30, 50, 80] },
+  { key: 'kanon',  ico: '\u{1F52B}', name: 'KANON',  del: 'arm-fram', prices: [18, 38, 70, 115, 175] },
+  { key: 'laser',  ico: '\u{1F441}️', name: 'LASER', del: 'hode', prices: [30, 55, 90, 140, 210] },
+  { key: 'hammer', ico: '\u{1F528}', name: 'HAMMER', del: 'arm-bak', prices: [25, 48, 82, 130, 195] },
+  { key: 'bein',   ico: '\u{1F9BF}', name: 'BEIN',   del: 'bein',     prices: [14, 28, 48, 78, 120] },
+  { key: 'panser', ico: '\u{1F6E1}️', name: 'PANSER', del: 'kropp', prices: [22, 44, 78, 124, 185] },
+  { key: 'jet',    ico: '\u{1F680}', name: 'JET',    del: 'rygg',     prices: [20, 40, 70, 110, 165] },
 ];
 
-export const MAX_LEVEL = 5; // hver oppgradering kan kjoepes 5 ganger
+export const MAX_LEVEL = 5;
 
 export function emptyUpgrades() {
   const u = {};
@@ -21,102 +23,127 @@ export function emptyUpgrades() {
   return u;
 }
 
-/** Regner ut robotens faktiske egenskaper ut fra oppgraderingsnivaaene. */
+export function totalLevels(up) {
+  return UPGRADES.reduce((s, u) => s + (up[u.key] || 0), 0);
+}
+
+/** Robotens faktiske egenskaper ut fra oppgraderingsnivaaene. */
 export function stats(up) {
+  const total = totalLevels(up);
   return {
-    dmg: 2 + up.dmg * 2,                 // 2 .. 12
-    cool: 0.42 - up.rate * 0.052,        // 0.42s .. 0.16s mellom skudd
-    speed: 250 + up.speed * 32,          // 250 .. 410 px/s
-    jump: 760 + up.speed * 26,           // hoppkraft
-    maxHp: 3 + up.hp,                    // 3 .. 8 hjerter
-    hasShield: up.shield > 0,
-    shieldCool: 7 - up.shield,           // 6s .. 2s paa aa lade skjoldet
-    magnet: 70 + up.magnet * 55,         // rekkevidde paa myntmagneten
+    // KANON - hovedvaapenet: hardere og raskere
+    dmg: 2 + up.kanon * 2.4,
+    cool: 0.44 - up.kanon * 0.05,        // 0.44s -> 0.19s
+
+    // LASER - skyter av seg selv mot naermeste monster
+    laser: up.laser,
+    laserDmg: up.laser * 3.5,
+    laserEvery: 3.4 - up.laser * 0.36,   // 3.0s -> 1.6s
+
+    // HAMMER - smeller automatisk paa alt som kommer for naerme
+    hammer: up.hammer,
+    hammerDmg: up.hammer * 4.5,
+    hammerRange: 26 + up.hammer * 13,
+    hammerEvery: 1.5 - up.hammer * 0.13,
+
+    // BEIN - fart og hopp
+    speed: 240 + up.bein * 32,
+    jump: 740 + up.bein * 30,
+
+    // PANSER - hjerter og skjold
+    maxHp: 3 + Math.ceil(up.panser * 0.8),   // 3 -> 7
+    hasShield: up.panser >= 2,
+    shieldCool: 9 - up.panser,
+
+    // JET - ekstra hopp i lufta
+    jumps: 1 + (up.jet > 0 ? 1 : 0) + (up.jet >= 4 ? 1 : 0),
+    jetPower: 0.62 + up.jet * 0.05,
+
+    // vokser med ALT du kjoeper
+    magnet: 90 + total * 9,
+    size: 50 + total * 2.3,              // robothoeyde: 50 -> 119 piksler
+    total,
   };
 }
 
 // ============================================================
 //  MONSTRE
 // ============================================================
-// ai: 'walk'   = gaar mot roboten paa bakken
-//     'fly'    = flyr i boelger mot roboten
-//     'hop'    = hopper mot roboten
-//     'shoot'  = holder avstand og skyter
-//     'cast'   = kaster magi som foelger etter deg
+// ai: 'walk'  gaar mot deg      'hop' hopper mot deg
+//     'fly'   flyr mot deg (spytter ild hvis den har shotEvery)
+//     'shoot' holder avstand og skyter
+//     'cast'  kaster magi som svinger etter deg
 export const ENEMIES = {
-  slim:   { hp: 4,  sp: 52,  w: 46, h: 42, ai: 'hop',   coins: [1, 3], touch: 1, body: '#5fd36a', dark: '#2f8f44', eyes: 2, face: '\u{1F7E2}' },
-  edder:  { hp: 4,  sp: 108, w: 50, h: 38, ai: 'walk',  coins: [2, 4], touch: 1, body: '#a06bf0', dark: '#5c3399', eyes: 4, legs: 6, face: '\u{1F577}️' },
-  flagg:  { hp: 2,  sp: 100, w: 48, h: 34, ai: 'fly',   coins: [2, 4], touch: 1, body: '#7a86c8', dark: '#3e4680', wings: true, face: '\u{1F987}' },
-  oye:    { hp: 10, sp: 40,  w: 50, h: 50, ai: 'shoot', coins: [4, 7], touch: 1, body: '#f472b6', dark: '#9d2c66', float: true, shotSpeed: 220, shotEvery: 2.1, face: '\u{1F441}️' },
-  stein:  { hp: 26, sp: 42,  w: 66, h: 70, ai: 'walk',  coins: [6, 10], touch: 2, body: '#8d8577', dark: '#57514a', rocky: true, face: '\u{1FAA8}' },
-  trollm: { hp: 16, sp: 50,  w: 50, h: 64, ai: 'cast',  coins: [6, 10], touch: 1, body: '#3ec7d6', dark: '#1d6d78', hood: true, shotSpeed: 150, shotEvery: 2.6, homing: true, face: '\u{1F9D9}' },
+  smaadrage:   { hp: 5,  sp: 58,  w: 56, h: 52, ai: 'hop',   coins: [2, 4],  touch: 1, body: '#5fd36a', dark: '#2f8f44', face: '\u{1F432}' },
+  ildoegle:    { hp: 5,  sp: 118, w: 64, h: 46, ai: 'walk',  coins: [2, 5],  touch: 1, body: '#f0743c', dark: '#9c3a12', face: '\u{1F98E}' },
+  flygedrage:  { hp: 4,  sp: 108, w: 68, h: 50, ai: 'fly',   coins: [3, 6],  touch: 1, body: '#7a86c8', dark: '#3e4680', face: '\u{1F409}', shotSpeed: 250, shotEvery: 2.6, shotColor: '#ff9a3d' },
+  isoegle:     { hp: 13, sp: 46,  w: 66, h: 60, ai: 'shoot', coins: [5, 9],  touch: 1, body: '#6fd6ef', dark: '#2a7f96', face: '\u{1F9CA}', shotSpeed: 250, shotEvery: 2.2, shotColor: '#bdf0ff' },
+  steintroll:  { hp: 32, sp: 46,  w: 82, h: 88, ai: 'walk',  coins: [8, 13], touch: 2, body: '#8d8577', dark: '#57514a', face: '\u{1F5FF}' },
+  skyggedrage: { hp: 20, sp: 60,  w: 74, h: 66, ai: 'cast',  coins: [8, 13], touch: 1, body: '#8b5cf6', dark: '#4c2a8f', face: '\u{1F311}', shotSpeed: 165, shotEvery: 2.7, shotColor: '#c9a3ff' },
 };
 
 // ============================================================
-//  SJEFER (en paa slutten av hvert nivaa)
+//  SJEFER - kjempestore, en paa slutten av hvert nivaa
 // ============================================================
 export const BOSSES = {
-  slimking:  { hp: 55,  w: 130, h: 118, sp: 60,  body: '#4fd06a', dark: '#22713a', face: '\u{1F451}', crown: true, pattern: 'jump-spawn', coins: 45 },
-  edderdron: { hp: 120, w: 150, h: 112, sp: 80,  body: '#a06bf0', dark: '#5c3399', face: '\u{1F578}️', legs: 8, pattern: 'spread',    coins: 65 },
-  flaggkon:  { hp: 190, w: 150, h: 96,  sp: 130, body: '#6b78c8', dark: '#333b74', face: '\u{1F987}', wings: true, fly: true, pattern: 'dive-bomb', coins: 85 },
-  steinkje:  { hp: 280, w: 160, h: 158, sp: 58,  body: '#8d8577', dark: '#4d4740', face: '\u{1F5FF}', rocky: true, pattern: 'slam',     coins: 110 },
-  trollmes:  { hp: 380, w: 130, h: 150, sp: 95,  body: '#3ec7d6', dark: '#155a63', face: '\u{1F9D9}', hood: true, pattern: 'teleport-orb', coins: 140 },
-  megamon:   { hp: 520, w: 190, h: 172, sp: 85,  body: '#ef4d5a', dark: '#8c1c28', face: '\u{1F479}', crown: true, horns: true, pattern: 'all-in',  coins: 200 },
+  godzaur:     { hp: 55,  w: 200, h: 180, sp: 62,  body: '#4f8f5a', dark: '#23512d', face: '\u{1F996}', pattern: 'slam',         coins: 65 },
+  roddrage:    { hp: 130, w: 250, h: 150, sp: 125, body: '#e04b3a', dark: '#8c1c14', face: '\u{1F409}', fly: true, pattern: 'dive-bomb', coins: 100 },
+  hydra:       { hp: 200, w: 220, h: 190, sp: 80,  body: '#3fb98a', dark: '#1a6b4d', face: '\u{1F40D}', pattern: 'spread',       coins: 145 },
+  frostdragen: { hp: 300, w: 225, h: 200, sp: 98,  body: '#7fd8f0', dark: '#256f8a', face: '❄️', fly: true, pattern: 'teleport-orb', coins: 200 },
+  kolossen:    { hp: 400, w: 235, h: 225, sp: 60,  body: '#a06a4a', dark: '#5a3624', face: '\u{1F5FF}', pattern: 'jump-spawn',   coins: 265 },
+  kongedragen: { hp: 560, w: 290, h: 250, sp: 90,  body: '#f0a63c', dark: '#8a520c', face: '\u{1F451}', pattern: 'all-in',       coins: 360 },
 };
 
 // ============================================================
 //  TEMAFARGER
+//  form: hva silhuettene i bakgrunnen er - 'hus', 'tre', 'spiss', 'fjell'
 // ============================================================
 export const THEMES = {
-  skrap: { sky: ['#2b3350', '#6a7aa4'], far: '#3c4668', mid: '#2b3450', ground: '#5b6455', ground2: '#414838', accent: '#9fe8ff', particle: '#cfd8e8' },
-  skog:  { sky: ['#5ec6ff', '#c4efff'], far: '#357f4e', mid: '#1f5c37', ground: '#55913f', ground2: '#35642a', accent: '#ffe27a', particle: '#bff0a0' },
-  hule:  { sky: ['#1a1030', '#3a2566'], far: '#3a2566', mid: '#281646', ground: '#4d3773', ground2: '#332250', accent: '#c48bff', particle: '#d8b4ff' },
-  is:    { sky: ['#8fd4ff', '#e8f8ff'], far: '#86bfe8', mid: '#5f97cc', ground: '#cbe9ff', ground2: '#9dc8e8', accent: '#3aa0ee', particle: '#ffffff' },
-  lava:  { sky: ['#3a0f12', '#a8391b'], far: '#61201a', mid: '#3d1210', ground: '#5f2d20', ground2: '#3c1b15', accent: '#ff9a3d', particle: '#ffb057' },
-  rom:   { sky: ['#05060f', '#1d2350'], far: '#1b2050', mid: '#10142f', ground: '#2f3566', ground2: '#1e2348', accent: '#7ae6ff', particle: '#ffffff', stars: true },
+  by:    { sky: ['#2b3350', '#7a6a94'], far: '#3c4668', mid: '#232b48', ground: '#4a4f5e', ground2: '#343846', accent: '#9fe8ff', particle: '#cfd8e8', form: 'hus' },
+  skog:  { sky: ['#5ec6ff', '#c4efff'], far: '#357f4e', mid: '#1f5c37', ground: '#55913f', ground2: '#35642a', accent: '#ffe27a', particle: '#bff0a0', form: 'tre' },
+  hule:  { sky: ['#1a1030', '#3a2566'], far: '#3a2566', mid: '#281646', ground: '#4d3773', ground2: '#332250', accent: '#c48bff', particle: '#d8b4ff', form: 'spiss' },
+  is:    { sky: ['#8fd4ff', '#e8f8ff'], far: '#86bfe8', mid: '#5f97cc', ground: '#cbe9ff', ground2: '#9dc8e8', accent: '#3aa0ee', particle: '#ffffff', form: 'spiss' },
+  lava:  { sky: ['#3a0f12', '#a8391b'], far: '#61201a', mid: '#3d1210', ground: '#5f2d20', ground2: '#3c1b15', accent: '#ff9a3d', particle: '#ffb057', form: 'fjell' },
+  rom:   { sky: ['#05060f', '#1d2350'], far: '#1b2050', mid: '#10142f', ground: '#2f3566', ground2: '#1e2348', accent: '#7ae6ff', particle: '#ffffff', form: 'fjell', stars: true },
 };
 
 // ============================================================
 //  NIVAAENE
 // ============================================================
-// len    = hvor langt nivaaet er (piksler)
-// mobs   = hvilke monstre og hvor mange
-// coins  = loese mynter spredd utover
-// root   = grunntone til musikken
 export const LEVELS = [
   {
-    theme: 'skrap', len: 4600, boss: 'slimking', coins: 24, root: 110,
-    mobs: [['slim', 9], ['edder', 3]],
-    preview: ['\u{1F7E2}', '\u{1F577}️'],
+    theme: 'by', len: 4600, boss: 'godzaur', coins: 26, root: 110,
+    mobs: [['smaadrage', 9], ['ildoegle', 4]],
+    preview: ['\u{1F432}', '\u{1F996}'],
   },
   {
-    theme: 'skog', len: 5200, boss: 'edderdron', coins: 28, root: 123,
-    mobs: [['slim', 7], ['edder', 7], ['flagg', 5]],
-    preview: ['\u{1F577}️', '\u{1F987}'],
+    theme: 'skog', len: 5200, boss: 'roddrage', coins: 30, root: 123,
+    mobs: [['smaadrage', 7], ['ildoegle', 7], ['flygedrage', 5]],
+    preview: ['\u{1F98E}', '\u{1F409}'],
   },
   {
-    theme: 'hule', len: 5800, boss: 'flaggkon', coins: 32, root: 98,
-    mobs: [['flagg', 9], ['edder', 6], ['oye', 4]],
-    preview: ['\u{1F987}', '\u{1F441}️'],
+    theme: 'hule', len: 5800, boss: 'hydra', coins: 34, root: 98,
+    mobs: [['flygedrage', 8], ['ildoegle', 6], ['isoegle', 5]],
+    preview: ['\u{1F409}', '\u{1F40D}'],
   },
   {
-    theme: 'is', len: 6200, boss: 'steinkje', coins: 34, root: 131,
-    mobs: [['edder', 7], ['oye', 6], ['stein', 4], ['flagg', 4]],
-    preview: ['\u{1F441}️', '\u{1FAA8}'],
+    theme: 'is', len: 6200, boss: 'frostdragen', coins: 36, root: 131,
+    mobs: [['isoegle', 7], ['flygedrage', 6], ['steintroll', 4], ['smaadrage', 4]],
+    preview: ['\u{1F9CA}', '❄️'],
   },
   {
-    theme: 'lava', len: 6600, boss: 'trollmes', coins: 38, root: 104,
-    mobs: [['stein', 6], ['oye', 7], ['trollm', 5], ['flagg', 5]],
-    preview: ['\u{1FAA8}', '\u{1F9D9}'],
+    theme: 'lava', len: 6600, boss: 'kolossen', coins: 40, root: 104,
+    mobs: [['steintroll', 6], ['ildoegle', 7], ['skyggedrage', 5], ['flygedrage', 5]],
+    preview: ['\u{1F5FF}', '\u{1F5FF}'],
   },
   {
-    theme: 'rom', len: 7000, boss: 'megamon', coins: 42, root: 87,
-    mobs: [['trollm', 7], ['stein', 6], ['oye', 7], ['flagg', 7], ['edder', 6]],
-    preview: ['\u{1F9D9}', '\u{1F479}'],
+    theme: 'rom', len: 7000, boss: 'kongedragen', coins: 44, root: 87,
+    mobs: [['skyggedrage', 7], ['steintroll', 6], ['isoegle', 6], ['flygedrage', 7], ['ildoegle', 6]],
+    preview: ['\u{1F311}', '\u{1F451}'],
   },
 ];
 
-/** Monstre blir litt seigere og gir litt mer mynt jo lenger ut i spillet du kommer. */
+/** Monstre blir seigere og gir mer mynt jo lenger ut i spillet du kommer. */
 export function levelScale(i) {
-  return { hp: 1 + i * 0.16, coin: 1 + i * 0.35 };
+  return { hp: 1 + i * 0.18, coin: 1 + i * 0.42 };
 }

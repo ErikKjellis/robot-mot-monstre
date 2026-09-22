@@ -3,12 +3,15 @@
 Et lite 2D-sidescroller-spill for nettbrett, laget for en 6-åring som nettopp har
 begynt å lese. Nesten all informasjon er ikoner, tall og enkeltord på norsk.
 
-Kjør roboten mot høyre, skyt monstre, samle mynter, og slå sjefen på slutten av
-hvert nivå. Mellom nivåene kjøper du oppgraderinger i butikken — og roboten
-**ser** faktisk bedre ut jo mer du har kjøpt. Poengsummen er hvor mye roboten er
-verdt.
+Roboten starter som en liten, enkel boks. For hver oppgradering blir den
+**større og mer utbygd** — laserøyne, kanonarm, hammer, panser, jetpack — helt
+til den er en kjempe som slåss mot Godzilla-aktige monstre og drager.
+Poengsummen er hvor mye roboten er verdt.
 
-Ingen rammeverk, ingen byggesteg, ingen bildefiler — bare HTML, CSS og JavaScript.
+**Du kan bytte ut alle figurene med PNG-er du tegner selv.**
+Se [art/LES-MEG.md](art/LES-MEG.md).
+
+Ingen rammeverk, ingen byggesteg, ingen avhengigheter.
 
 ---
 
@@ -36,8 +39,9 @@ node serve.js
 | ⬆ grønn knapp nede til høyre | mellomrom / pil opp / W |
 | 💥 rød knapp nede til høyre | J, K, Z eller Shift |
 
-Hold 💥 inne for å skyte i ett sett. Du kan også hoppe **oppå** små monstre for
-å knuse dem.
+Hold 💥 inne for å skyte i ett sett. Du kan hoppe **oppå** små monstre for å
+knuse dem. Laseren og hammeren går av seg selv når du har kjøpt dem — ingen
+ekstra knapper å huske.
 
 ---
 
@@ -48,8 +52,10 @@ Hold 💥 inne for å skyte i ett sett. Du kan også hoppe **oppå** små monstr
 
 ```bash
 git remote add origin https://github.com/BRUKERNAVN/robot-mot-monstre.git
-git branch -M main
-git push -u origin main
+```
+
+```bash
+git branch -M main && git push -u origin main
 ```
 
 3. På GitHub: **Settings → Pages → Source: Deploy from a branch**, velg
@@ -64,28 +70,52 @@ Da starter spillet i fullskjerm uten adresselinje, og virker også uten nett.
 
 ---
 
+## 🎨 Egne figurer
+
+Tegn monstrene selv og legg dem i `art/`-mappa. Spillet plukker dem opp uten at
+du rører koden. Tre nivåer:
+
+- **Én PNG** for hele figuren → den puster og hopper
+- **Én PNG per kroppsdel** (kropp, hode, armer, bein, hale, vinger) → beina
+  svinger, hodet nikker, vingene flakser
+- **Ingen fil** → spillet tegner figuren selv
+
+`art/monstre/smaadrage/` er et **ferdig eksempel** med alle sju delene, og
+`art/maler/mal-tobeint.png` er en mal du kan tegne oppå.
+
+**Full oppskrift med mål, festepunkter og filnavn: [art/LES-MEG.md](art/LES-MEG.md)**
+
+### Figurtesteren
+
+Åpne `verktoy/figurtest.html` mens serveren kjører. Den viser figuren stor og i
+bevegelse, lister opp hvilke filer den fant og hvilke som mangler, og lar deg dra
+i oppgraderingsnivåene for å se roboten bygge seg om.
+
+---
+
 ## Nivåer og monstre
 
 | Nivå | Sted | Nye monstre | Sjef |
 |---|---|---|---|
-| 1 | Skraphaug | slim, edderkopp | 👑 Slimkongen |
-| 2 | Skog | flaggermus | 🕸️ Edderkoppdronninga |
-| 3 | Hule | øyet (skyter) | 🦇 Flaggermuskongen |
-| 4 | Is | steintrollet | 🗿 Steinkjempen |
-| 5 | Lava | trollmannen (magi som følger etter deg) | 🧙 Trollmesteren |
-| 6 | Rommet | alt sammen | 👹 Mega-Monsteret |
+| 1 | Byen | liten drage, ildøgle | 🦖 Godzaur |
+| 2 | Skogen | flygedrage | 🐉 Røddragen |
+| 3 | Hulen | isøgle (spytter) | 🐍 Hydra |
+| 4 | Isen | steintroll | ❄️ Frostdragen |
+| 5 | Lava | skyggedrage (magi som følger etter deg) | 🗿 Kolossen |
+| 6 | Rommet | alt sammen | 👑 Kongedragen |
 
-Fra nivå 3 begynner monstrene å skyte, og fra nivå 5 kaster trollmennene magi
-som svinger etter roboten.
+Fra nivå 2 begynner dragene å spytte ild, og fra nivå 5 kaster skyggedragene
+magi som svinger etter roboten.
 
 ## Butikken
 
 | | | |
 |---|---|---|
-| 💥 **SKADE** — hardere skudd | ⚡ **SKYT** — skyter oftere | 👟 **FART** — løper og hopper bedre |
-| ❤️ **LIV** — flere hjerter | 🛡️ **SKJOLD** — tåler ett treff, lader seg opp | 🧲 **MAGNET** — suger til seg mynter |
+| 🔫 **KANON** — hardere og raskere skudd | 👁️ **LASER** — laserøyne som skyter av seg selv | 🔨 **HAMMER** — smeller på alt som kommer nær |
+| 🦿 **BEIN** — løper og hopper bedre | 🛡️ **PANSER** — flere hjerter og skjold | 🚀 **JET** — dobbelt- og trippelhopp |
 
-Hver kan kjøpes 5 ganger. Hjertene fylles opp ved starten av hvert nivå.
+Hver kan kjøpes 5 ganger, og **hver eneste en gjør roboten større**.
+Hjertene fylles opp ved starten av hvert nivå.
 
 ## Poeng
 
@@ -108,14 +138,15 @@ Nesten alt som bestemmer vanskelighetsgrad ligger i [`js/content.js`](js/content
 - `UPGRADES` / `stats()` — priser og hva oppgraderingene gjør
 - `levelScale()` — hvor mye seigere monstrene blir utover i spillet
 
-**Er det for vanskelig?** Sett ned `hp` på monstrene, eller gi flere starthjerter
-ved å endre `maxHp: 3 + up.hp` i `stats()`.
+**For vanskelig?** Sett ned `hp` på monstrene, eller gi flere starthjerter ved å
+endre `maxHp: 3 + ...` i `stats()`.
 
 I nettleserkonsollen finnes `game` for fikling:
 
 ```js
 game.run.coins = 999                      // masse mynter
 game.player.x = game.world.bossAt + 10    // hopp rett til sjefen
+Object.keys(game.run.up).forEach(k => game.run.up[k] = 5); game.refreshStats()
 ```
 
 ## Filer
@@ -125,10 +156,14 @@ index.html            skjermbildene (meny, butikk, poengliste)
 css/style.css         utseende, store trykkeknapper
 js/core.js            matte, lagring, lyd (lages i WebAudio), kontroller
 js/content.js         monstre, sjefer, nivåer, oppgraderinger  ← skru her
-js/art.js             all tegning (ingen bildefiler)
+js/rigs.js            hvilke kroppsdeler hver figur har         ← figurer
+js/sprites.js         laster PNG-figurer og animerer delene
+js/art.js             spillets egen strektegning (når du ikke har PNG-er)
 js/game.js            fysikk, monster-AI, sjefsmønstre
 js/ui.js              HUD, butikk, poengliste
 js/main.js            starter spillet, bytter skjermbilder
+art/                  dine egne figurer  ← se art/LES-MEG.md
+verktoy/figurtest.html    test dine egne figurer
 sw.js                 gjør at spillet virker uten nett
 serve.js              liten lokal server for testing
 ```

@@ -1,14 +1,27 @@
 // game.js - selve spillet: roboten, monstrene, sjefene og banen.
 
-import { clamp, rand, randInt, pick, chance, mulberry32, overlap, sound, input, TAU } from './core.js';
+import { clamp, rand, randInt, chance, mulberry32, overlap, sound, input, TAU } from './core.js';
 import { LEVELS, THEMES, ENEMIES, BOSSES, stats, emptyUpgrades, levelScale } from './content.js';
+import { ROBOT_RIG, rigFor, MONSTER_RIGS } from './rigs.js';
+import * as sprites from './sprites.js';
 import * as art from './art.js';
 
 export const VIEW_H = 540;
 const GROUND_Y = 452;
 const GRAV = 2300;
-const ARENA_MIN = 1000;   // hvor stor sjefsarenaen er
-const MAX_ACTIVE = 8;     // aldri mer enn saa mange monstre paa skjermen samtidig
+const ARENA_MIN = 1000;
+const MAX_ACTIVE = 8;
+
+/**
+ * Ser etter egne PNG-figurer. Bare grunnfilene hentes med en gang -
+ * oppgraderings-variantene lastes foerst naar de faktisk kjoepes.
+ * Finnes ingen filer tegner spillet figurene selv, og de 404-ene du
+ * ser i nettleserkonsollen er helt ufarlige.
+ */
+export function preloadFigures() {
+  sprites.preload(sprites.rigPaths(ROBOT_RIG, 0));
+  Object.values(MONSTER_RIGS).forEach((r) => sprites.preload(sprites.rigPaths(r, 0)));
+}
 
 export class Game {
   constructor(canvas) {
@@ -31,35 +44,33 @@ export class Game {
   resize() {
     const vw = Math.max(1, window.innerWidth);
     const vh = Math.max(1, window.innerHeight);
-    const aspect = vw / vh;
     this.H = VIEW_H;
-    this.W = Math.round(clamp(VIEW_H * aspect, 700, 1500));
+    this.W = Math.round(clamp(VIEW_H * (vw / vh), 700, 1500));
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.canvas.width = Math.round(this.W * this.dpr);
     this.canvas.height = Math.round(this.H * this.dpr);
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    this.ctx.imageSmoothingEnabled = true;
-    if (this.world && this.world.locked) {
-      this.world.wallX = this.arenaWall(this.world);
-    }
+    if (this.world && this.world.locked) this.world.wallX = this.arenaWall(this.world);
   }
 
   // ---------------------------------------------------------------
   newRun() {
-    this.run = {
-      level: 0,
-      coins: 0,
-      spent: 0,
-      cleared: 0,
-      up: emptyUpgrades(),
-      hp: 3,
-    };
+    this.run = { level: 0, coins: 0, spent: 0, cleared: 0, up: emptyUpgrades(), hp: 3 };
     this.refreshStats();
     this.run.hp = this.st.maxHp;
   }
 
   refreshStats() {
     this.st = stats(this.run.up);
+    // Roboten vokser for hver oppgradering - behold foettene paa samme sted.
+    if (this.player) {
+      const feet = this.player.y + this.player.h;
+      const mid = this.player.x + this.player.w / 2;
+      this.player.h = this.st.size;
+      this.player.w = this.st.size * 0.58;
+      this.player.y = feet - this.player.h;
+      this.player.x = mid - this.player.w / 2;
+    }
   }
 
   get worth() {
@@ -81,7 +92,7 @@ export class Game {
   startLevel(i) {
     this.run.level = i;
     this.refreshStats();
-    this.run.hp = this.st.maxHp;        // fullt liv ved starten av hvert nivaa
+    this.run.hp = this.st.maxHp;
     this.buildLevel(i);
     sound.setIntense(false);
   }
@@ -97,26 +108,22 @@ export class Game {
     const platforms = [];
     const n = Math.floor((bossAt - 900) / 520);
     for (let k = 0; k < n; k++) {
-      const x = 800 + k * 520 + rng() * 180;
-      const y = GROUND_Y - (110 + rng() * 130);
-      platforms.push({ x, y, w: 130 + rng() * 110, h: 26 });
+      platforms.push({
+        x: 800 + k * 520 + rng() * 180,
+        y: GROUND_Y - (110 + rng() * 130),
+        w: 130 + rng() * 110, h: 26,
+      });
     }
 
-    // Monstre fordeles utover banen
     const pending = [];
     L.mobs.forEach(([key, count]) => {
-      for (let k = 0; k < count; k++) {
-        const x = 760 + rng() * (bossAt - 900);
-        pending.push({ key, x });
-      }
+      for (let k = 0; k < count; k++) pending.push({ key, x: 760 + rng() * (bossAt - 900) });
     });
     pending.sort((a, b) => a.x - b.x);
 
-    // Loese mynter - noen paa bakken, noen paa plattformene
     const coins = [];
     for (let k = 0; k < L.coins; k++) {
-      const onPlat = platforms.length && rng() < 0.45;
-      if (onPlat) {
+      if (platforms.length && rng() < 0.45) {
         const p = platforms[Math.floor(rng() * platforms.length)];
         coins.push(this.mkCoin(p.x + 20 + rng() * (p.w - 40), p.y - 26, 1));
       } else {
@@ -127,28 +134,24 @@ export class Game {
     this.world = {
       i, L, th, len, bossAt, sc,
       platforms, pending, coins,
-      enemies: [], bullets: [], parts: [], texts: [], pickups: [],
+      enemies: [], bullets: [], parts: [], texts: [], pickups: [], lasers: [], smashes: [],
       camX: 0, wallX: 0, locked: false, boss: null,
       cleared: false, clearT: 0, gateOpen: false,
       coinsAtStart: this.run.coins,
     };
 
+    const size = this.st.size;
     this.player = {
-      x: 140, y: GROUND_Y - 62, w: 46, h: 62,
+      x: 140, y: GROUND_Y - size, w: size * 0.58, h: size,
       vx: 0, vy: 0, onGround: false, facing: 1,
       coyote: 0, cool: 0, inv: 0, walk: 0, flashShot: 0,
       shieldUp: this.st.hasShield, shieldT: 0, dying: 0,
+      jumpsLeft: 0, laserCool: 1.2, smashCool: 0.6, smashT: 0,
     };
     this.shakeT = 0;
   }
 
-  /**
-   * Venstre vegg i sjefsarenaen. Ligger aldri til hoeyre for der spilleren
-   * utloeste kampen, uansett hvor bredt eller smalt nettbrettet er.
-   */
-  arenaWall(w) {
-    return Math.max(0, Math.min(w.bossAt, w.len - this.W));
-  }
+  arenaWall(w) { return Math.max(0, Math.min(w.bossAt, w.len - this.W)); }
 
   mkCoin(x, y, val) {
     return { x, y, vx: 0, vy: 0, r: 11, seed: Math.random() * 10, val: val || 1, rest: false };
@@ -175,21 +178,16 @@ export class Game {
     this.updateParts(dt);
     this.updateCamera(dt);
 
-    // Sjefen dukker opp
     if (!w.locked && this.player.x > w.bossAt) {
       w.locked = true;
       w.wallX = this.arenaWall(w);
-      // dytt spilleren litt inn i arenaen saa han ikke staar klistret til porten
       this.player.x = Math.max(this.player.x, w.wallX + 150);
       this.spawnBoss();
     }
 
     if (w.cleared) {
       w.clearT += dt;
-      if (w.clearT > 1.5) {
-        w.cleared = false;
-        this.onEvent('cleared');
-      }
+      if (w.clearT > 1.5) { w.cleared = false; this.onEvent('cleared'); }
     }
 
     if (this.player.dying > 0) {
@@ -220,22 +218,28 @@ export class Game {
     else if (target < p.vx) p.vx = Math.max(target, p.vx - accel * dt);
     if (move === 0 && p.onGround) p.vx *= Math.pow(0.0008, dt);
 
-    // hopp - med litt slingringsmonn slik at det foeles snilt
-    if (p.onGround) p.coyote = 0.13; else p.coyote -= dt;
-    if (input.jumpBuffer > 0 && p.coyote > 0) {
-      p.vy = -st.jump;
-      p.onGround = false;
-      p.coyote = 0;
-      input.jumpBuffer = 0;
-      sound.jump();
-      this.puff(p.x + p.w / 2, p.y + p.h, 6, '#ffffff');
+    // hopp - med slingringsmonn, og ekstra hopp i lufta om du har JET
+    if (p.onGround) { p.coyote = 0.13; p.jumpsLeft = st.jumps - 1; } else p.coyote -= dt;
+    if (input.jumpBuffer > 0) {
+      if (p.coyote > 0) {
+        p.vy = -st.jump;
+        p.onGround = false; p.coyote = 0;
+        input.jumpBuffer = 0;
+        sound.jump();
+        this.puff(p.x + p.w / 2, p.y + p.h, 6, '#ffffff');
+      } else if (p.jumpsLeft > 0) {
+        p.jumpsLeft--;
+        p.vy = -st.jump * st.jetPower;
+        input.jumpBuffer = 0;
+        sound.jump();
+        this.ring(p.x + p.w / 2, p.y + p.h, 30, '#ffb347');
+        this.puff(p.x + p.w / 2, p.y + p.h, 8, '#ffb347');
+      }
     }
-    // slipper du hoppknappen tidlig, hopper du kortere
     if (!input.jumpHeld && p.vy < -220) p.vy += GRAV * 1.6 * dt;
 
     p.vy += GRAV * dt;
     p.vy = Math.min(p.vy, 1400);
-
     p.x += p.vx * dt;
     p.y += p.vy * dt;
     this.collide(p);
@@ -246,19 +250,34 @@ export class Game {
 
     if (p.onGround && Math.abs(p.vx) > 30) p.walk += dt * Math.abs(p.vx) * 0.045;
 
-    // skyting
+    // --- KANON ---
     p.cool -= dt;
     p.flashShot = Math.max(0, p.flashShot - dt * 7);
     if (input.shoot && p.cool <= 0) {
       p.cool = st.cool;
       p.flashShot = 1;
-      const bx = p.x + p.w / 2 + p.facing * (p.h * 0.34 + 16);
-      const by = p.y + p.h * 0.36;
-      w.bullets.push({ x: bx, y: by, vx: p.facing * 760, vy: 0, r: 8, dmg: st.dmg, friendly: true, life: 1.5 });
+      const bx = p.x + p.w / 2 + p.facing * (p.h * 0.42);
+      const by = p.y + p.h * 0.42;
+      w.bullets.push({
+        x: bx, y: by, vx: p.facing * 780, vy: 0,
+        r: 7 + st.dmg * 0.5, dmg: st.dmg, friendly: true, life: 1.5,
+      });
       sound.shoot();
     }
 
-    // skjold lader seg opp igjen
+    // --- LASEROEYNE: skyter av seg selv paa naermeste monster ---
+    if (st.laser > 0) {
+      p.laserCool -= dt;
+      if (p.laserCool <= 0 && this.fireLaser()) p.laserCool = st.laserEvery;
+    }
+
+    // --- HAMMER: smeller paa alt som kommer for naerme ---
+    p.smashT = Math.max(0, p.smashT - dt);
+    if (st.hammer > 0) {
+      p.smashCool -= dt;
+      if (p.smashCool <= 0) this.trySmash();
+    }
+
     if (st.hasShield && !p.shieldUp) {
       p.shieldT -= dt;
       if (p.shieldT <= 0) { p.shieldUp = true; this.ring(p.x + p.w / 2, p.y + p.h / 2, 40, '#7fe8ff'); }
@@ -266,16 +285,58 @@ export class Game {
     if (p.inv > 0) p.inv -= dt;
   }
 
+  fireLaser() {
+    const p = this.player, w = this.world, st = this.st;
+    const ex = p.x + p.w / 2, ey = p.y + p.h * 0.16;
+    let best = null, bd = 1e9;
+    for (const e of w.enemies) {
+      const d = Math.hypot(e.x + e.w / 2 - ex, e.y + e.h / 2 - ey);
+      if (d < 620 && d < bd) { bd = d; best = e; }
+    }
+    if (!best) return false;
+    const tx = best.x + best.w / 2, ty = best.y + best.h / 2;
+    const ang = Math.atan2(ty - ey, tx - ex);
+    const reach = bd * 1.35 + 60;
+    const x1 = ex + Math.cos(ang) * reach, y1 = ey + Math.sin(ang) * reach;
+
+    // straalen gaar tvers gjennom - alt den treffer faar skade
+    for (const e of w.enemies) {
+      if (segHitsBox(ex, ey, x1, y1, e)) this.hurtEnemy(e, st.laserDmg, e.x + e.w / 2, e.y + e.h / 2);
+    }
+    w.lasers.push({ x0: ex, y0: ey, x1, y1, life: 0.22, max: 0.22 });
+    sound.laser();
+    return true;
+  }
+
+  trySmash() {
+    const p = this.player, w = this.world, st = this.st;
+    const cx = p.x + p.w / 2, cy = p.y + p.h * 0.55;
+    const R = st.hammerRange + p.w * 0.5;
+    let hit = false;
+    for (const e of w.enemies) {
+      const d = Math.hypot(e.x + e.w / 2 - cx, e.y + e.h / 2 - cy);
+      if (d < R + e.w * 0.4) {
+        this.hurtEnemy(e, st.hammerDmg, e.x + e.w / 2, e.y + e.h / 2);
+        if (!e.boss) { e.vx += (e.x + e.w / 2 < cx ? -1 : 1) * 320; e.vy = -220; }
+        hit = true;
+      }
+    }
+    if (!hit) return;
+    p.smashCool = st.hammerEvery;
+    p.smashT = 0.28;
+    w.smashes.push({ x: cx + p.facing * R * 0.4, y: cy, r: R, life: 0.25, max: 0.25 });
+    this.shake(0.14, 6);
+    sound.smash();
+  }
+
   collide(e) {
     const w = this.world;
     e.onGround = false;
-    // bakken
     if (e.y + e.h >= GROUND_Y) {
       e.y = GROUND_Y - e.h;
       if (e.vy > 0) e.vy = 0;
       e.onGround = true;
     }
-    // plattformer - du kan hoppe opp gjennom dem og lande paa toppen
     for (const p of w.platforms) {
       if (e.vy < 0) continue;
       if (e.x + e.w < p.x + 4 || e.x > p.x + p.w - 4) continue;
@@ -320,29 +381,25 @@ export class Game {
     const w = this.world;
     const edge = w.camX + this.W + 90;
     while (w.pending.length && w.pending[0].x < edge) {
+      if (w.enemies.length >= MAX_ACTIVE) break;
       const s = w.pending.shift();
-      if (w.enemies.length >= MAX_ACTIVE) { w.pending.unshift(s); break; }
       this.spawnEnemy(s.key, s.x);
     }
   }
 
-  spawnEnemy(key, x, opt = {}) {
+  spawnEnemy(key, x) {
     const d = ENEMIES[key];
     const w = this.world;
-    const flying = d.ai === 'fly' || d.float;
+    const flying = d.ai === 'fly';
     const e = {
       key, def: d, boss: false,
       w: d.w, h: d.h,
       x: x - d.w / 2,
-      y: flying ? GROUND_Y - 150 - rand(0, 110) : GROUND_Y - d.h,
+      y: flying ? GROUND_Y - 170 - rand(0, 110) : GROUND_Y - d.h,
       vx: 0, vy: 0, onGround: false, facing: -1,
       hp: Math.round(d.hp * w.sc.hp), maxHp: Math.round(d.hp * w.sc.hp),
-      seed: rand(0, 10), hurtT: 0, timer: rand(0, 1.4), state: 0, anim: true,
-      baseY: 0,
+      seed: rand(0, 10), hurtT: 0, timer: rand(0, 1.4), state: 0, walk: rand(0, 6),
     };
-    e.baseY = e.y;
-    if (opt.vx != null) e.vx = opt.vx;
-    if (opt.vy != null) e.vy = opt.vy;
     w.enemies.push(e);
     return e;
   }
@@ -354,14 +411,12 @@ export class Game {
     const b = {
       key, def: d, boss: true, pattern: d.pattern,
       w: d.w, h: d.h,
-      x: w.len - 300 - d.w / 2,
+      x: w.len - 320 - d.w / 2,
       y: d.fly ? GROUND_Y - 300 : GROUND_Y - d.h,
       vx: 0, vy: 0, onGround: false, facing: -1,
       hp: d.hp, maxHp: d.hp,
-      seed: rand(0, 10), hurtT: 0, timer: 1.4, state: 0, anim: true,
-      baseY: 0, phase: 0,
+      seed: rand(0, 10), hurtT: 0, timer: 1.4, state: 0, phase: 0, walk: 0,
     };
-    b.baseY = b.y;
     w.enemies.push(b);
     w.boss = b;
     sound.boss();
@@ -380,14 +435,13 @@ export class Game {
       if (e.hurtT > 0) e.hurtT -= dt;
       e.timer -= dt;
       const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
-      const dir = pcx < ecx ? -1 : 1;
-      e.facing = dir;
+      e.facing = pcx < ecx ? -1 : 1;
 
-      if (e.boss) this.bossAI(e, dt, dir, pcx, pcy);
-      else this.mobAI(e, dt, dir, pcx, pcy);
+      if (e.boss) this.bossAI(e, dt, e.facing, pcx, pcy);
+      else this.mobAI(e, dt, e.facing, pcx, pcy);
 
-      // enkel fysikk for de som gaar paa bakken
-      if (!(d.ai === 'fly' || d.float || (e.boss && d.fly))) {
+      const flies = d.ai === 'fly' || (e.boss && d.fly);
+      if (!flies) {
         e.vy += GRAV * dt;
         e.x += e.vx * dt;
         e.y += e.vy * dt;
@@ -397,8 +451,8 @@ export class Game {
         e.y += e.vy * dt;
       }
       e.x = clamp(e.x, (w.locked ? w.wallX : 0) + 2, w.len - e.w - 2);
+      e.walk += dt * (flies ? 5 : 3 + Math.abs(e.vx) * 0.03);
 
-      // kontaktskade + trampe paa hodet
       if (p.dying <= 0 && overlap(p, e)) {
         const stomping = p.vy > 140 && p.y + p.h - p.vy * dt <= e.y + e.h * 0.45;
         if (stomping && !e.boss) {
@@ -410,15 +464,12 @@ export class Game {
         }
       }
 
-      if (e.hp <= 0) {
-        this.killEnemy(e, i);
-      }
+      if (e.hp <= 0) this.killEnemy(e, i);
     }
   }
 
   mobAI(e, dt, dir, pcx, pcy) {
     const d = e.def;
-    const w = this.world;
     const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
     const dist = Math.abs(pcx - ecx);
 
@@ -434,23 +485,26 @@ export class Game {
         }
       }
     } else if (d.ai === 'fly') {
-      const ty = pcy - 40 + Math.sin(this.t * 2.2 + e.seed) * 60;
+      const ty = pcy - 60 + Math.sin(this.t * 2.2 + e.seed) * 60;
       e.vx = dir * d.sp;
       e.vy = clamp((ty - ecy) * 2.4, -170, 170);
+      // drager spytter ild
+      if (d.shotEvery && e.timer <= 0 && dist < 520) {
+        e.timer = d.shotEvery;
+        this.enemyShot(ecx, ecy, pcx, pcy, d.shotSpeed, d.shotColor);
+      }
     } else if (d.ai === 'shoot') {
-      // holder avstand og skyter
       const want = 320;
       e.vx = dist > want + 60 ? dir * d.sp : dist < want - 60 ? -dir * d.sp : e.vx * 0.9;
-      e.vy = Math.sin(this.t * 2 + e.seed) * 26;
       if (e.timer <= 0 && dist < 620) {
         e.timer = d.shotEvery;
-        this.enemyShot(ecx, ecy, pcx, pcy, d.shotSpeed, '#ff7ad9');
+        this.enemyShot(ecx, ecy - e.h * 0.2, pcx, pcy, d.shotSpeed, d.shotColor);
       }
     } else if (d.ai === 'cast') {
       e.vx = dist > 420 ? dir * d.sp : dist < 260 ? -dir * d.sp * 0.7 : 0;
       if (e.timer <= 0 && dist < 700) {
         e.timer = d.shotEvery;
-        const b = this.enemyShot(ecx, ecy - e.h * 0.4, pcx, pcy, d.shotSpeed, '#ffe66d');
+        const b = this.enemyShot(ecx, ecy - e.h * 0.3, pcx, pcy, d.shotSpeed, d.shotColor);
         b.homing = 2.2;
         b.r = 13;
       }
@@ -461,20 +515,19 @@ export class Game {
     const d = e.def;
     const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
     const dist = Math.abs(pcx - ecx);
-    const hpFrac = e.hp / e.maxHp;
-    const rage = hpFrac < 0.4 ? 0.65 : 1; // blir raskere naar den er skadet
+    const rage = e.hp / e.maxHp < 0.4 ? 0.65 : 1;
 
     switch (e.pattern) {
       case 'jump-spawn': {
         if (e.onGround) {
           e.vx *= 0.85;
           if (e.timer <= 0) {
-            e.timer = 1.7 * rage;
+            e.timer = 1.8 * rage;
             e.vy = -700;
             e.vx = dir * d.sp * 2.6;
             e.state++;
             if (e.state % 3 === 0) {
-              for (let k = 0; k < 2; k++) this.spawnEnemy('slim', ecx + rand(-90, 90));
+              for (let k = 0; k < 2; k++) this.spawnEnemy('smaadrage', ecx + rand(-90, 90));
             }
           }
         }
@@ -485,7 +538,7 @@ export class Game {
         if (e.timer <= 0) {
           e.timer = 2.3 * rage;
           for (let k = -2; k <= 2; k++) {
-            const b = this.enemyShot(ecx, ecy, pcx, pcy, 260, '#c39bff');
+            const b = this.enemyShot(ecx, ecy - e.h * 0.2, pcx, pcy, 280, '#8ef0c0');
             const a = Math.atan2(b.vy, b.vx) + k * 0.2;
             const sp = Math.hypot(b.vx, b.vy);
             b.vx = Math.cos(a) * sp; b.vy = Math.sin(a) * sp;
@@ -496,13 +549,13 @@ export class Game {
       }
       case 'dive-bomb': {
         if (e.state === 0) {
-          const ty = GROUND_Y - 300 + Math.sin(this.t * 1.6) * 50;
+          const ty = GROUND_Y - 320 + Math.sin(this.t * 1.6) * 50;
           e.vx = clamp((pcx - ecx) * 1.8, -d.sp, d.sp);
-          e.vy = clamp((ty - ecy) * 2.2, -200, 200);
+          e.vy = clamp((ty - ecy) * 2.2, -220, 220);
           if (e.timer <= 0) {
             e.timer = 2.4 * rage;
-            if (chance(0.5)) { e.state = 1; e.vy = 640; }
-            else this.enemyShot(ecx, ecy + e.h * 0.4, pcx, GROUND_Y, 300, '#ff9a3d');
+            if (chance(0.5)) { e.state = 1; e.vy = 660; }
+            else this.enemyShot(ecx, ecy + e.h * 0.3, pcx, GROUND_Y, 320, '#ff9a3d');
           }
         } else {
           e.vx *= 0.96;
@@ -517,12 +570,8 @@ export class Game {
         break;
       }
       case 'slam': {
-        e.vx = dist > 180 ? dir * d.sp : 0;
-        if (e.onGround && e.timer <= 0) {
-          e.timer = 3.0 * rage;
-          e.vy = -520;
-          e.state = 1;
-        }
+        e.vx = dist > 190 ? dir * d.sp : 0;
+        if (e.onGround && e.timer <= 0) { e.timer = 3.0 * rage; e.vy = -520; e.state = 1; }
         if (e.state === 1 && e.onGround && e.vy === 0) {
           e.state = 0;
           this.shake(0.35, 14);
@@ -538,16 +587,16 @@ export class Game {
           e.timer = 2.6 * rage;
           if (e.state === 0) {
             for (let k = 0; k < 3; k++) {
-              const b = this.enemyShot(ecx, ecy - 20 + k * 22, pcx, pcy, 175, '#ffe66d');
+              const b = this.enemyShot(ecx, ecy - 20 + k * 22, pcx, pcy, 180, '#bdf0ff');
               b.homing = 2.6; b.r = 14;
             }
             e.state = 1;
           } else {
-            this.puff(ecx, ecy, 16, '#3ec7d6');
-            e.x = clamp(pcx + (chance(0.5) ? -360 : 360) - e.w / 2,
+            this.puff(ecx, ecy, 16, d.body);
+            e.x = clamp(pcx + (chance(0.5) ? -380 : 380) - e.w / 2,
               this.world.wallX + 20, this.world.len - e.w - 20);
-            e.y = GROUND_Y - e.h;
-            this.puff(e.x + e.w / 2, ecy, 16, '#3ec7d6');
+            e.y = GROUND_Y - e.h - 140;
+            this.puff(e.x + e.w / 2, ecy, 16, d.body);
             e.state = 0;
             e.timer = 0.7;
           }
@@ -555,23 +604,22 @@ export class Game {
         break;
       }
       case 'all-in': {
-        e.vx = dist > 240 ? dir * d.sp : -dir * d.sp * 0.4;
+        e.vx = dist > 260 ? dir * d.sp : -dir * d.sp * 0.4;
         if (e.onGround && e.timer <= 0) {
           e.timer = 2.0 * rage;
           e.phase = (e.phase + 1) % 3;
           if (e.phase === 0) {
             for (let k = -3; k <= 3; k++) {
-              const b = this.enemyShot(ecx, ecy, pcx, pcy, 300, '#ff6b6b');
+              const b = this.enemyShot(ecx, ecy, pcx, pcy, 320, '#ff6b6b');
               const a = Math.atan2(b.vy, b.vx) + k * 0.17;
               const sp = Math.hypot(b.vx, b.vy);
               b.vx = Math.cos(a) * sp; b.vy = Math.sin(a) * sp;
             }
           } else if (e.phase === 1) {
-            e.vy = -560;
-            e.state = 1;
+            e.vy = -560; e.state = 1;
           } else {
-            this.spawnEnemy('flagg', ecx - 60);
-            this.spawnEnemy('flagg', ecx + 60);
+            this.spawnEnemy('flygedrage', ecx - 80);
+            this.spawnEnemy('flygedrage', ecx + 80);
           }
         }
         if (e.state === 1 && e.onGround && e.vy === 0) {
@@ -582,13 +630,12 @@ export class Game {
     }
   }
 
-  /** Sjokkboelge langs bakken i begge retninger. */
   shock(x) {
     const w = this.world;
     for (const s of [-1, 1]) {
       w.bullets.push({
         x: x + s * 40, y: GROUND_Y - 18, vx: s * 320, vy: 0, r: 16,
-        friendly: false, life: 3, color: '#ff9a3d', ground: true,
+        friendly: false, life: 3, color: '#ff9a3d',
       });
     }
     this.ring(x, GROUND_Y - 10, 60, '#ff9a3d');
@@ -596,10 +643,7 @@ export class Game {
 
   enemyShot(x, y, tx, ty, sp, color) {
     const a = Math.atan2(ty - y, tx - x);
-    const b = {
-      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-      r: 10, friendly: false, life: 5, color,
-    };
+    const b = { x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 10, friendly: false, life: 5, color };
     this.world.bullets.push(b);
     return b;
   }
@@ -617,10 +661,9 @@ export class Game {
     const cx = e.x + e.w / 2, cy = e.y + e.h / 2;
     sound.kill();
     this.puff(cx, cy, e.boss ? 40 : 12, e.def.body);
-    this.ring(cx, cy, e.boss ? 140 : 46, e.def.body);
+    this.ring(cx, cy, e.boss ? 160 : 46, e.def.body);
 
-    const cr = e.def.coins;
-    let n = e.boss ? e.def.coins : randInt(cr[0], cr[1]);
+    let n = e.boss ? e.def.coins : randInt(e.def.coins[0], e.def.coins[1]);
     if (!e.boss) n = Math.max(1, Math.round(n * w.sc.coin));
     for (let k = 0; k < n; k++) {
       const c = this.mkCoin(cx + rand(-14, 14), cy, 1);
@@ -628,7 +671,6 @@ export class Game {
       c.vy = rand(-380, -160);
       w.coins.push(c);
     }
-    // av og til faller det et hjerte
     if (!e.boss && chance(0.09) && this.run.hp < this.st.maxHp) {
       w.pickups.push({ x: cx, y: cy, vx: rand(-60, 60), vy: -260, r: 16, life: 16 });
     } else if (e.boss) {
@@ -648,7 +690,6 @@ export class Game {
     }
   }
 
-  // --- skudd ---
   updateBullets(dt) {
     const w = this.world;
     const p = this.player;
@@ -675,28 +716,19 @@ export class Game {
 
       if (!gone && b.friendly) {
         for (const e of w.enemies) {
-          if (overlap(box, e)) {
-            this.hurtEnemy(e, b.dmg, b.x, b.y);
-            gone = true;
-            break;
-          }
+          if (overlap(box, e)) { this.hurtEnemy(e, b.dmg, b.x, b.y); gone = true; break; }
         }
       } else if (!gone) {
-        if (p.dying <= 0 && overlap(box, p)) {
-          this.damagePlayer(1, b.x);
-          gone = true;
-        }
+        if (p.dying <= 0 && overlap(box, p)) { this.damagePlayer(1, b.x); gone = true; }
       }
       if (gone) w.bullets.splice(i, 1);
     }
   }
 
-  // --- mynter ---
   updateCoins(dt) {
     const w = this.world;
     const p = this.player;
     const pcx = p.x + p.w / 2, pcy = p.y + p.h / 2;
-    // Naar sjefen er slaatt suges alle mynter inn - ingen skal gaa glipp av gevinsten.
     const mag = w.cleared ? 1e6 : this.st.magnet;
     for (let i = w.coins.length - 1; i >= 0; i--) {
       const c = w.coins[i];
@@ -715,12 +747,10 @@ export class Game {
         c.x += c.vx * dt;
         c.y += c.vy * dt;
         if (c.y > GROUND_Y - c.r && dist >= mag) {
-          c.y = GROUND_Y - c.r;
-          c.vy = 0; c.vx = 0;
-          c.rest = true;
+          c.y = GROUND_Y - c.r; c.vy = 0; c.vx = 0; c.rest = true;
         }
       }
-      if (dist < 34) {
+      if (dist < 34 + p.w * 0.2) {
         this.run.coins += c.val;
         w.coins.splice(i, 1);
         sound.coin();
@@ -751,7 +781,6 @@ export class Game {
     }
   }
 
-  // --- effekter ---
   puff(x, y, n, color) {
     const w = this.world;
     for (let i = 0; i < n; i++) {
@@ -784,11 +813,12 @@ export class Game {
       }
       if (p.life <= 0) w.parts.splice(i, 1);
     }
-    for (let i = w.texts.length - 1; i >= 0; i--) {
-      const ft = w.texts[i];
-      ft.life -= dt;
-      ft.y += ft.vy * dt;
-      if (ft.life <= 0) w.texts.splice(i, 1);
+    for (const arr of [w.texts, w.lasers, w.smashes]) {
+      for (let i = arr.length - 1; i >= 0; i--) {
+        arr[i].life -= dt;
+        if (arr[i].vy) arr[i].y += arr[i].vy * dt;
+        if (arr[i].life <= 0) arr.splice(i, 1);
+      }
     }
   }
 
@@ -796,12 +826,7 @@ export class Game {
     const w = this.world;
     const p = this.player;
     const maxX = Math.max(0, w.len - this.W);
-    let target;
-    if (w.locked) {
-      target = w.wallX;
-    } else {
-      target = p.x + p.w / 2 - this.W * 0.40;
-    }
+    let target = w.locked ? w.wallX : p.x + p.w / 2 - this.W * 0.40;
     target = clamp(target, 0, maxX);
     w.camX += (target - w.camX) * Math.min(1, dt * 7);
     if (w.locked) w.camX = target;
@@ -814,11 +839,7 @@ export class Game {
     const ctx = this.ctx;
     const w = this.world;
     const W = this.W, H = this.H;
-    if (!w) {
-      ctx.fillStyle = '#0b1020';
-      ctx.fillRect(0, 0, W, H);
-      return;
-    }
+    if (!w) { ctx.fillStyle = '#0b1020'; ctx.fillRect(0, 0, W, H); return; }
     const th = w.th;
     art.drawBackground(ctx, th, w.camX, W, H, this.t);
     art.drawGround(ctx, th, w.camX, W, H, GROUND_Y);
@@ -836,7 +857,6 @@ export class Game {
       if (p.x + p.w < w.camX - 60 || p.x > w.camX + W + 60) continue;
       art.drawPlatform(ctx, p, th, 0);
     }
-
     art.drawGate(ctx, (w.locked ? w.wallX : w.bossAt) + 26, GROUND_Y, th, this.t, w.gateOpen);
 
     for (const c of w.coins) {
@@ -846,42 +866,71 @@ export class Game {
     for (const h of w.pickups) art.drawHeart(ctx, h.x, h.y, h.r, this.t);
 
     for (const e of w.enemies) {
-      if (e.x + e.w < w.camX - 80 || e.x > w.camX + W + 80) continue;
-      art.drawCreature(ctx, e, this.t);
+      if (e.x + e.w < w.camX - 160 || e.x > w.camX + W + 160) continue;
+      this.drawEnemy(ctx, e);
     }
 
     for (const b of w.bullets) art.drawBullet(ctx, b);
+    for (const s of w.smashes) art.drawSmash(ctx, s);
 
-    const p = this.player;
-    const blink = p.inv > 0 && Math.floor(p.inv * 14) % 2 === 0;
-    if (!blink) {
-      ctx.save();
-      if (p.dying > 0) {
-        ctx.translate(p.x + p.w / 2, p.y + p.h / 2);
-        ctx.rotate((1.3 - p.dying) * 3);
-        ctx.translate(-(p.x + p.w / 2), -(p.y + p.h / 2));
-      }
-      art.drawRobot(ctx, p.x + p.w / 2, p.y + p.h, p.h, {
-        up: this.run.up,
-        facing: p.facing,
-        walk: p.walk,
-        moving: Math.abs(p.vx) > 30,
-        onGround: p.onGround,
-        t: this.t,
-        flashShot: p.flashShot,
-        shieldOn: p.shieldUp,
-        flash: p.inv > 0.9,
-      });
-      ctx.restore();
-    }
+    this.drawPlayer(ctx);
 
+    for (const l of w.lasers) art.drawLaser(ctx, l);
     for (const pt of w.parts) art.drawParticle(ctx, pt);
     for (const ft of w.texts) art.drawFloatText(ctx, ft);
 
     ctx.restore();
   }
 
-  // Tall som HUD-en trenger
+  /** Proever egne PNG-figurer foerst, faller tilbake paa innebygd tegning. */
+  drawEnemy(ctx, e) {
+    const rig = rigFor(e.key);
+    const ok = rig && sprites.drawRig(ctx, rig, {
+      x: e.x + e.w / 2, y: e.y + e.h, h: e.h,
+      facing: e.facing, walk: e.walk || 0,
+      move: Math.abs(e.vx) > 12 ? 1 : 0.25,
+      t: this.t, seed: e.seed,
+      flash: e.hurtT > 0 && Math.floor(e.hurtT * 30) % 2 === 0,
+    });
+    if (!ok) art.drawCreature(ctx, e, this.t);
+  }
+
+  drawPlayer(ctx) {
+    const p = this.player;
+    if (p.inv > 0 && Math.floor(p.inv * 14) % 2 === 0) return;
+    ctx.save();
+    if (p.dying > 0) {
+      ctx.translate(p.x + p.w / 2, p.y + p.h / 2);
+      ctx.rotate((1.3 - p.dying) * 3);
+      ctx.translate(-(p.x + p.w / 2), -(p.y + p.h / 2));
+    }
+    const s = {
+      x: p.x + p.w / 2, y: p.y + p.h, h: p.h,
+      facing: p.facing, walk: p.walk,
+      move: Math.abs(p.vx) > 30 ? 1 : 0,
+      t: this.t,
+      aim: 0, recoil: p.flashShot, smash: p.smashT / 0.28,
+      flash: p.inv > 0.9,
+      variants: this.run.up,
+    };
+    if (!sprites.drawRig(ctx, ROBOT_RIG, s)) {
+      art.drawRobot(ctx, s.x, s.y, p.h, {
+        up: this.run.up, facing: p.facing, walk: p.walk,
+        moving: s.move > 0, onGround: p.onGround, t: this.t,
+        flashShot: p.flashShot, smash: s.smash, shieldOn: p.shieldUp,
+        flash: p.inv > 0.9,
+      });
+    } else if (p.shieldUp) {
+      ctx.save();
+      ctx.globalAlpha = 0.26 + 0.1 * Math.sin(this.t * 8);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y - p.h * 0.5, p.h * 0.62, 0, TAU);
+      ctx.fillStyle = '#7fe8ff'; ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
   hudState() {
     const w = this.world;
     return {
@@ -894,6 +943,17 @@ export class Game {
       bossFace: w && w.boss ? w.boss.def.face : '',
     };
   }
+}
+
+/** Treffer linja fra (x0,y0) til (x1,y1) boksen e? Vi sjekker noen punkter. */
+function segHitsBox(x0, y0, x1, y1, e) {
+  const steps = 14;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t;
+    if (x >= e.x && x <= e.x + e.w && y >= e.y && y <= e.y + e.h) return true;
+  }
+  return false;
 }
 
 export { GROUND_Y };

@@ -1,5 +1,5 @@
 // sw.js - enkel offline-cache, slik at spillet virker uten nett paa nettbrettet.
-const CACHE = 'robot-monstre-v1';
+const CACHE = 'robot-monstre-v2';
 const FILES = [
   './',
   './index.html',
@@ -10,6 +10,8 @@ const FILES = [
   './js/core.js',
   './js/content.js',
   './js/ui.js',
+  './js/sprites.js',
+  './js/rigs.js',
   './icon.svg',
   './manifest.webmanifest',
 ];
@@ -33,8 +35,12 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(
     fetch(e.request)
       .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+        // Bare lagre svar som faktisk virket. Lagrer vi en 404 vil en PNG du
+        // legger inn senere aldri dukke opp.
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+        }
         return res;
       })
       .catch(() => caches.match(e.request).then((r) => r || caches.match('./index.html')))
