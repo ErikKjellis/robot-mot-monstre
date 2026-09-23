@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Riggverksted - Robot mot Monstre</title>
+<style>
+  :root{ --ink:#0d1220; --panel:#18203a; --panel2:#222c4e; --line:#33406b;
+         --paper:#eaf0ff; --green:#39c26a; --red:#ef4d5a; --yellow:#f7c33a; --blue:#3aa0ee; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ink);color:var(--paper);
+       font-family:"Verdana","Segoe UI",system-ui,sans-serif;font-size:14px;overflow:hidden}
+  header{padding:9px 16px;border-bottom:2px solid var(--line);display:flex;
+         align-items:center;gap:14px;flex-wrap:wrap}
+  h1{font-size:17px;margin:0;letter-spacing:.5px}
+  header .hint{opacity:.62;font-size:12.5px}
+  .wrap{display:flex;height:calc(100vh - 46px)}
+  .stage{flex:1;position:relative;background:#1b2238;min-width:0}
+  canvas{display:block;width:100%;height:100%;cursor:crosshair}
+  .side{width:330px;flex:0 0 330px;border-left:2px solid var(--line);
+        overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:12px}
+  .card{background:var(--panel);border:2px solid var(--line);border-radius:11px;padding:10px}
+  .card h2{margin:0 0 8px;font-size:11.5px;letter-spacing:1.6px;opacity:.72;text-transform:uppercase}
+  select,input[type=text],input[type=number]{background:var(--panel2);color:var(--paper);
+    border:2px solid var(--line);border-radius:7px;padding:5px 7px;font-family:inherit;font-size:13px;width:100%}
+  label{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px}
+  label span:first-child{flex:0 0 74px;opacity:.8}
+  input[type=range]{flex:1;min-width:0}
+  .val{flex:0 0 46px;text-align:right;font-variant-numeric:tabular-nums;opacity:.85;font-size:12px}
+  button{font-family:inherit;font-weight:bold;font-size:13px;cursor:pointer;
+    background:var(--panel2);color:var(--paper);border:2px solid var(--line);
+    border-radius:8px;padding:6px 10px}
+  button:hover{border-color:#4e5f96}
+  button.on{background:var(--green);border-color:var(--green);color:#042a12}
+  button.prim{background:var(--blue);border-color:var(--blue);color:#04263f}
+  button.warn{background:var(--red);border-color:var(--red);color:#fff}
+  .row{display:flex;gap:6px;flex-wrap:wrap}
+  .parts{list-style:none;margin:0;padding:0}
+  .parts li{display:flex;align-items:center;gap:6px;padding:5px 7px;border-radius:7px;
+            background:var(--panel2);margin-bottom:4px;cursor:pointer;font-size:13px}
+  .parts li.sel{outline:2px solid var(--yellow)}
+  .parts li.miss{opacity:.45}
+  .parts li b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:normal}
+  .parts li .zbtn{padding:1px 6px;font-size:11px;border-radius:5px}
+  .eye{width:20px;text-align:center}
+  .tip{font-size:12px;line-height:1.5;opacity:.68;margin:6px 0 0}
+  .badge{font-size:11px;background:var(--line);border-radius:5px;padding:1px 5px;opacity:.9}
+  #drop{position:absolute;inset:0;background:rgba(58,160,238,.25);
+        border:4px dashed var(--blue);display:none;align-items:center;justify-content:center;
+        font-size:22px;font-weight:bold;pointer-events:none}
+  #drop.on{display:flex}
+</style>
+</head>
+<body>
+<header>
+  <h1>🔧 Riggverksted</h1>
+  <span class="hint">Dra delen for å flytte den · dra den <b style="color:#f7c33a">gule prikken</b> for å sette leddet · dra den <b style="color:#ff9a3d">oransje</b> for rotasjonspunkt</span>
+</header>
+
+<div class="wrap">
+  <div class="stage">
+    <canvas id="c"></canvas>
+    <div id="drop">Slipp PNG-filer her</div>
+  </div>
+
+  <div class="side">
+    <div class="card">
+      <h2>Figur</h2>
+      <select id="fig"></select>
+      <div class="row" style="margin-top:8px">
+        <button id="bWalk">🏃 Gå</button>
+        <button id="bGrid" class="on">📐 Rutenett</button>
+        <button id="bBone">🦴 Ledd</button>
+      </div>
+      <label><span>Sikte</span><input id="aim" type="range" min="-90" max="90" value="0"><span class="val" id="aimV">0°</span></label>
+      <label><span>Slag</span><input id="smash" type="range" min="0" max="100" value="0"><span class="val" id="smashV">0</span></label>
+      <label><span>Vis som</span><select id="vari"></select></label>
+    </div>
+
+    <div class="card">
+      <h2>Deler <span class="badge" id="cnt">0</span></h2>
+      <ul class="parts" id="list"></ul>
+      <div class="row">
+        <button id="bAdd" class="prim">+ Legg til PNG</button>
+        <button id="bDel" class="warn">Slett</button>
+      </div>
+      <input id="file" type="file" accept="image/png" multiple hidden>
+      <p class="tip">Filene må ligge i figurens egen mappe. Navnet på fila blir navnet på delen.</p>
+    </div>
+
+    <div class="card" id="edit">
+      <h2>Valgt del</h2>
+      <div id="noSel" class="tip">Klikk på en del i figuren eller i lista.</div>
+      <div id="ctrls" hidden>
+        <label><span>Størrelse</span><input id="pH" type="range" min="2" max="140" value="40"><span class="val" id="pHV">.40</span></label>
+        <label><span>Vinkel</span><input id="pRot" type="range" min="-180" max="180" value="0"><span class="val" id="pRotV">0°</span></label>
+        <label><span>Speil</span><input id="pFlip" type="checkbox"></label>
+        <label><span>Beveger</span><select id="pMove"></select></label>
+        <label><span>Krever</span><select id="pReq"></select></label>
+        <label><span>Fase</span><input id="pPhase" type="range" min="0" max="360" value="0"><span class="val" id="pPhaseV">0°</span></label>
+        <div class="row" style="margin-top:6px">
+          <button id="bOm">Sett rotasjonspunkt</button>
+          <button id="bOmClr">Nullstill</button>
+        </div>
+        <p class="tip" id="posInfo"></p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Lagre</h2>
+      <div class="row">
+        <button id="bSave" class="prim">💾 Last ned rigg.json</button>
+        <button id="bCopy">📋 Kopier</button>
+      </div>
+      <p class="tip">Legg <b>rigg.json</b> i figurens mappe (f.eks. <code>art/robot/</code>).
+        Spillet bruker den automatisk — du trenger ikke røre koden.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { setBase, setBust, tex, placedLayout, paintPart } from '../js/sprites.js';
+import { ROBOT_RIG, MONSTER_RIGS } from '../js/rigs.js';
+import { UPGRADES } from '../js/content.js';
+
+setBase('../');
+setBust(true);
+
+const RIGS = Object.assign({ robot: ROBOT_RIG }, MONSTER_RIGS);
+const MOVES = ['ingen', 'gaa', 'sving', 'duv', 'nikk', 'vinge', 'hale', 'sikte', 'slag'];
+
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+const $ = (id) => document.getElementById(id);
+
+const ui = { walk: false, grid: true, bone: false, aim: 0, smash: 0, vari: 'alt' };
+let figKey = 'robot';
+let rig = null;            // { mappe, plassert, variant, deler:[...] }
+let sel = -1;
+let t = 0, walkPh = 0;
+let drag = null;           // {mode:'move'|'joint'|'om', ...}
+let omPick = false;
+const blobs = new Map();   // navn -> Image (filer lagt til lokalt)
+
+// ---------------------------------------------------------------
+//  Oppsett av menyer
+// ---------------------------------------------------------------
+Object.keys(RIGS).forEach((k) => {
+  const o = document.createElement('option');
+  o.value = k; o.textContent = k;
+  $('fig').appendChild(o);
+});
+MOVES.forEach((m) => {
+  const o = document.createElement('option'); o.value = m; o.textContent = m;
+  $('pMove').appendChild(o);
+});
+{
+  const o = document.createElement('option'); o.value = ''; o.textContent = '(alltid)';
+  $('pReq').appendChild(o);
+  UPGRADES.forEach((u) => {
+    const x = document.createElement('option'); x.value = u.key; x.textContent = u.ico + ' ' + u.name;
+    $('pReq').appendChild(x);
+  });
+  const all = document.createElement('option'); all.value = 'alt'; all.textContent = 'alt påskrudd';
+  $('vari').appendChild(all);
+  const none = document.createElement('option'); none.value = 'ingen'; none.textContent = 'ingenting kjøpt';
+  $('vari').appendChild(none);
+}
+
+function variants() {
+  const v = {};
+  UPGRADES.forEach((u) => (v[u.key] = ui.vari === 'ingen' ? 0 : 3));
+  return v;
+}
+
+// ---------------------------------------------------------------
+//  Laste og lagre rigg
+// ---------------------------------------------------------------
+async function loadFig(key) {
+  figKey = key;
+  const base = RIGS[key];
+  sel = -1;
+  let saved = null;
+  try {
+    const r = await fetch('../' + base.mappe + '/rigg.json?t=' + Date.now());
+    if (r.ok) saved = await r.json();
+  } catch (e) { /* ingen lagret rigg */ }
+
+  rig = {
+    mappe: base.mappe,
+    plassert: true,
+    variant: base.variant || {},
+    deler: JSON.parse(JSON.stringify((saved && saved.deler) || base.deler || [])),
+  };
+  // deler fra en gammel felles-lerret-rigg har ikke plassering - gi dem noe
+  rig.deler.forEach((p, i) => {
+    if (!p.paa) p.paa = [0, -0.5 - i * 0.02];
+    if (!p.h) p.h = 0.4;
+    if (!p.fest) p.fest = [0.5, 0.5];
+    if (p.z == null) p.z = i * 10;
+  });
+  blobs.clear();
+  rebuildList();
+}
+
+function serialise() {
+  const deler = rig.deler.map((p) => {
+    const o = { navn: p.navn, z: p.z, h: +(+p.h).toFixed(3),
+      fest: p.fest.map((v) => +(+v).toFixed(3)), paa: p.paa.map((v) => +(+v).toFixed(3)) };
+    if (p.beveg && p.beveg !== 'ingen') o.beveg = p.beveg;
+    if (p.speil) o.speil = true;
+    if (p.vinkel) o.vinkel = +(+p.vinkel).toFixed(3);
+    if (p.omkring) o.omkring = p.omkring.map((v) => +(+v).toFixed(3));
+    if (p.krever) o.krever = p.krever;
+    if (p.fase) o.fase = +(+p.fase).toFixed(3);
+    if (p.styrke != null) o.styrke = p.styrke;
+    return o;
+  });
+  return JSON.stringify({ plassert: true, deler }, null, 2);
+}
+
+$('bSave').onclick = () => {
+  const blob = new Blob([serialise()], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'rigg.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+};
+$('bCopy').onclick = async () => {
+  try { await navigator.clipboard.writeText(serialise()); $('bCopy').textContent = '✓ Kopiert'; }
+  catch (e) { $('bCopy').textContent = 'Kunne ikke kopiere'; }
+  setTimeout(() => ($('bCopy').textContent = '📋 Kopier'), 1500);
+};
+
+// ---------------------------------------------------------------
+//  Deleliste
+// ---------------------------------------------------------------
+function rebuildList() {
+  const ul = $('list');
+  ul.innerHTML = '';
+  const order = rig.deler.map((p, i) => i).sort((a, b) => (rig.deler[b].z || 0) - (rig.deler[a].z || 0));
+  order.forEach((i) => {
+    const p = rig.deler[i];
+    const li = document.createElement('li');
+    if (i === sel) li.className = 'sel';
+    const has = !!(blobs.get(p.navn) || tex(rig.mappe + '/' + p.navn + '.png'));
+    if (!has) li.classList.add('miss');
+    li.innerHTML = '<span class="eye">' + (p.av ? '🚫' : '👁') + '</span><b>' + p.navn + '</b>' +
+      '<button class="zbtn" data-up="' + i + '">▲</button><button class="zbtn" data-dn="' + i + '">▼</button>';
+    li.onclick = (e) => {
+      if (e.target.dataset.up != null) { bump(+e.target.dataset.up, 1); return; }
+      if (e.target.dataset.dn != null) { bump(+e.target.dataset.dn, -1); return; }
+      if (e.target.classList.contains('eye')) { p.av = !p.av; rebuildList(); return; }
+      select(i);
+    };
+    ul.appendChild(li);
+  });
+  $('cnt').textContent = rig.deler.length;
+  syncCtrls();
+}
+
+function bump(i, dir) {
+  const zs = rig.deler.map((p) => p.z || 0).sort((a, b) => a - b);
+  const cur = rig.deler[i].z || 0;
+  const next = dir > 0 ? zs.find((z) => z > cur) : [...zs].reverse().find((z) => z < cur);
+  if (next == null) { rig.deler[i].z = cur + dir * 10; } else {
+    const other = rig.deler.find((p) => (p.z || 0) === next);
+    rig.deler[i].z = next; if (other) other.z = cur;
+  }
+  rebuildList();
+}
+
+function select(i) { sel = i; rebuildList(); }
+
+// ---------------------------------------------------------------
+//  Kontroller for valgt del
+// ---------------------------------------------------------------
+function syncCtrls() {
+  const p = rig.deler[sel];
+  $('ctrls').hidden = !p;
+  $('noSel').hidden = !!p;
+  if (!p) return;
+  $('pH').value = Math.round((p.h || 0.4) * 100);
+  $('pHV').textContent = (+p.h).toFixed(2);
+  $('pRot').value = Math.round((p.vinkel || 0) * 180 / Math.PI);
+  $('pRotV').textContent = $('pRot').value + '°';
+  $('pFlip').checked = !!p.speil;
+  $('pMove').value = p.beveg || 'ingen';
+  $('pReq').value = p.krever || '';
+  $('pPhase').value = Math.round(((p.fase || 0) * 180 / Math.PI + 360) % 360);
+  $('pPhaseV').textContent = $('pPhase').value + '°';
+  $('posInfo').textContent =
+    'ledd i bildet ' + p.fest.map((v) => v.toFixed(2)).join(', ') +
+    '  ·  festet på ' + p.paa.map((v) => v.toFixed(2)).join(', ') +
+    (p.omkring ? '  ·  roterer om ' + p.omkring.map((v) => v.toFixed(2)).join(', ') : '');
+}
+
+$('pH').oninput = (e) => { rig.deler[sel].h = +e.target.value / 100; $('pHV').textContent = (+e.target.value / 100).toFixed(2); };
+$('pRot').oninput = (e) => { rig.deler[sel].vinkel = +e.target.value * Math.PI / 180; $('pRotV').textContent = e.target.value + '°'; };
+$('pFlip').onchange = (e) => { rig.deler[sel].speil = e.target.checked; };
+$('pMove').onchange = (e) => { rig.deler[sel].beveg = e.target.value; };
+$('pReq').onchange = (e) => { rig.deler[sel].krever = e.target.value || undefined; };
+$('pPhase').oninput = (e) => { rig.deler[sel].fase = +e.target.value * Math.PI / 180; $('pPhaseV').textContent = e.target.value + '°'; };
+$('bOm').onclick = () => { omPick = true; $('bOm').classList.add('on'); };
+$('bOmClr').onclick = () => { if (rig.deler[sel]) rig.deler[sel].omkring = undefined; syncCtrls(); };
+$('bDel').onclick = () => { if (sel >= 0) { rig.deler.splice(sel, 1); sel = -1; rebuildList(); } };
+
+const toggle = (id, key) => { $(id).onclick = () => { ui[key] = !ui[key]; $(id).classList.toggle('on', ui[key]); }; };
+toggle('bWalk', 'walk'); toggle('bGrid', 'grid'); toggle('bBone', 'bone');
+$('aim').oninput = (e) => { ui.aim = +e.target.value * Math.PI / 180; $('aimV').textContent = e.target.value + '°'; };
+$('smash').oninput = (e) => { ui.smash = +e.target.value / 100; $('smashV').textContent = e.target.value; };
+$('vari').onchange = (e) => { ui.vari = e.target.value; };
+$('fig').onchange = (e) => loadFig(e.target.value);
+
+// ---------------------------------------------------------------
+//  Legge til PNG
+// ---------------------------------------------------------------
+$('bAdd').onclick = () => $('file').click();
+$('file').onchange = (e) => addFiles(e.target.files);
+
+const stage = document.querySelector('.stage');
+['dragenter', 'dragover'].forEach((ev) => stage.addEventListener(ev, (e) => {
+  e.preventDefault(); $('drop').classList.add('on');
+}));
+['dragleave', 'drop'].forEach((ev) => stage.addEventListener(ev, (e) => {
+  e.preventDefault(); $('drop').classList.remove('on');
+}));
+stage.addEventListener('drop', (e) => addFiles(e.dataTransfer.files));
+
+function addFiles(files) {
+  [...files].forEach((f) => {
+    const navn = f.name.replace(/\.png$/i, '');
+    const img = new Image();
+    img.onload = () => {
+      blobs.set(navn, img);
+      if (!rig.deler.some((p) => p.navn === navn)) {
+        const maxZ = Math.max(0, ...rig.deler.map((p) => p.z || 0));
+        rig.deler.push({ navn, z: maxZ + 10, h: 0.35, fest: [0.5, 0.5], paa: [0, -0.5], beveg: 'ingen' });
+      }
+      sel = rig.deler.findIndex((p) => p.navn === navn);
+      rebuildList();
+    };
+    img.src = URL.createObjectURL(f);
+  });
+}
+
+// ---------------------------------------------------------------
+//  Tegning
+// ---------------------------------------------------------------
+function state() {
+  return {
+    x: 0, y: 0, h: view.H, facing: 1, walk: walkPh, move: ui.walk ? 1 : 0,
+    t, seed: 1, aim: ui.aim, recoil: 0, smash: ui.smash, variants: variants(),
+  };
+}
+
+const view = { H: 420, ox: 0, oy: 0 };
+
+function layout() {
+  // gi delene bildene som er lagt inn lokalt
+  rig.deler.forEach((p) => { p.bilde = blobs.get(p.navn) || undefined; });
+  return placedLayout(rig, state());
+}
+
+function draw() {
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const w = c.clientWidth, h = c.clientHeight;
+  if (c.width !== Math.round(w * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  view.H = Math.min(h * 0.72, w * 0.5);
+  view.ox = w / 2;
+  view.oy = h * 0.86;
+
+  // bakgrunn
+  ctx.fillStyle = '#1b2238'; ctx.fillRect(0, 0, w, h);
+  if (ui.grid) {
+    ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1;
+    const step = view.H / 10;
+    for (let x = view.ox % step; x < w; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+    for (let y = view.oy % step; y > 0; y -= step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+  }
+  // bakke og midtlinje
+  ctx.strokeStyle = 'rgba(120,255,170,.5)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, view.oy); ctx.lineTo(w, view.oy); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,.22)';
+  ctx.beginPath(); ctx.moveTo(view.ox, 0); ctx.lineTo(view.ox, h); ctx.stroke();
+  // hoydemerke
+  ctx.strokeStyle = 'rgba(255,255,255,.15)'; ctx.setLineDash([5, 5]);
+  ctx.beginPath(); ctx.moveTo(0, view.oy - view.H); ctx.lineTo(w, view.oy - view.H); ctx.stroke();
+  ctx.setLineDash([]);
+
+  const L = layout();
+  ctx.save();
+  ctx.translate(view.ox, view.oy);
+  for (const item of L) paintPart(ctx, item);
+  ctx.restore();
+
+  // handtak
+  ctx.save();
+  ctx.translate(view.ox, view.oy);
+  L.forEach((item) => {
+    const i = rig.deler.indexOf(item.p);
+    const on = i === sel;
+    if (ui.bone || on) {
+      ctx.beginPath(); ctx.arc(item.ax, item.ay, on ? 9 : 5, 0, Math.PI * 2);
+      ctx.fillStyle = on ? '#f7c33a' : 'rgba(247,195,58,.5)';
+      ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = '#141a2e'; ctx.stroke();
+    }
+    if (on) {
+      // ramme rundt valgt del
+      ctx.save();
+      ctx.translate(item.dx, item.dy);
+      if (item.rot) { ctx.translate(item.rx, item.ry); ctx.rotate(item.rot); ctx.translate(-item.rx, -item.ry); }
+      ctx.translate(item.ax, item.ay);
+      if (item.p.speil) ctx.scale(-1, 1);
+      ctx.strokeStyle = 'rgba(247,195,58,.85)'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+      ctx.strokeRect(-item.jx * item.pw, -item.jy * item.ph, item.pw, item.ph);
+      ctx.setLineDash([]);
+      ctx.restore();
+      if (item.p.omkring) {
+        ctx.beginPath(); ctx.arc(item.rx, item.ry, 8, 0, Math.PI * 2);
+        ctx.fillStyle = '#ff9a3d'; ctx.fill();
+        ctx.lineWidth = 2; ctx.strokeStyle = '#141a2e'; ctx.stroke();
+      }
+    }
+  });
+  ctx.restore();
+
+  if (omPick) {
+    ctx.fillStyle = '#ff9a3d'; ctx.font = 'bold 15px Verdana'; ctx.textAlign = 'center';
+    ctx.fillText('Klikk der delen skal rotere om', w / 2, 30);
+  }
+}
+
+// ---------------------------------------------------------------
+//  Mus
+// ---------------------------------------------------------------
+const toFig = (e) => {
+  const r = c.getBoundingClientRect();
+  return { x: (e.clientX - r.left - view.ox) / view.H, y: (e.clientY - r.top - view.oy) / view.H };
+};
+
+c.addEventListener('pointerdown', (e) => {
+  const f = toFig(e);
+  const L = layout();
+  if (omPick && sel >= 0) {
+    rig.deler[sel].omkring = [f.x, f.y];
+    omPick = false; $('bOm').classList.remove('on'); syncCtrls();
+    return;
+  }
+  // handtak foerst
+  const cur = L.find((it) => rig.deler.indexOf(it.p) === sel);
+  if (cur) {
+    const d = Math.hypot(f.x * view.H - cur.ax, f.y * view.H - cur.ay);
+    if (d < 13) { drag = { mode: 'joint', i: sel }; c.setPointerCapture(e.pointerId); return; }
+    if (cur.p.omkring) {
+      const d2 = Math.hypot(f.x * view.H - cur.rx, f.y * view.H - cur.ry);
+      if (d2 < 13) { drag = { mode: 'om', i: sel }; c.setPointerCapture(e.pointerId); return; }
+    }
+  }
+  // ellers: finn delen under musa (oeverste foerst)
+  for (let k = L.length - 1; k >= 0; k--) {
+    if (hit(L[k], f)) {
+      const i = rig.deler.indexOf(L[k].p);
+      select(i);
+      drag = { mode: 'move', i, gx: f.x - L[k].p.paa[0], gy: f.y - L[k].p.paa[1] };
+      c.setPointerCapture(e.pointerId);
+      return;
+    }
+  }
+  select(-1);
+});
+
+c.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const f = toFig(e);
+  const p = rig.deler[drag.i];
+  if (!p) return;
+  if (drag.mode === 'move') {
+    p.paa = [+(f.x - drag.gx).toFixed(4), +(f.y - drag.gy).toFixed(4)];
+  } else if (drag.mode === 'om') {
+    p.omkring = [+f.x.toFixed(4), +f.y.toFixed(4)];
+  } else {
+    // sett ledd: bildet blir staaende, leddet flytter seg inni det
+    const it = layout().find((x) => x.p === p);
+    if (!it) return;
+    const dx = f.x * view.H - it.ax, dy = f.y * view.H - it.ay;
+    const sx = p.speil ? -1 : 1;
+    p.fest = [
+      +Math.max(-1, Math.min(2, it.jx + (dx * sx) / it.pw)).toFixed(4),
+      +Math.max(-1, Math.min(2, it.jy + dy / it.ph)).toFixed(4),
+    ];
+    p.paa = [+f.x.toFixed(4), +f.y.toFixed(4)];
+  }
+  syncCtrls();
+});
+
+const stop = (e) => { drag = null; };
+c.addEventListener('pointerup', stop);
+c.addEventListener('pointercancel', stop);
+
+/** Traff musa en ugjennomsiktig piksel i delen? */
+const hitCan = document.createElement('canvas');
+const hitCtx = hitCan.getContext('2d', { willReadFrequently: true });
+function hit(item, f) {
+  const px = f.x * view.H, py = f.y * view.H;
+  hitCan.width = 1; hitCan.height = 1;
+  hitCtx.save();
+  hitCtx.translate(-px, -py);
+  paintPart(hitCtx, item);
+  hitCtx.restore();
+  return hitCtx.getImageData(0, 0, 1, 1).data[3] > 12;
+}
+
+// ---------------------------------------------------------------
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  t += dt;
+  if (ui.walk) walkPh += dt * 7;
+  if (rig) draw();
+  requestAnimationFrame(loop);
+}
+await loadFig('robot');
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

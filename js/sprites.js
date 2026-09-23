@@ -121,10 +121,35 @@ const MOVES = {
  * s = { x, y (under foettene), h (hoeyde), facing, walk, move, t,
  *       aim, recoil, smash, flash, variants }
  */
+// ---------------------------------------------------------------
+//  EGEN RIGG FRA FIL
+//  Lagrer du art/<figur>/rigg.json fra rigg-redigereren, brukes den
+//  i stedet for oppsettet i js/rigs.js. Da slipper du aa roere koden.
+// ---------------------------------------------------------------
+const rigFile = new Map();
+function customRig(rig) {
+  const key = rig.mappe;
+  if (!rigFile.has(key)) {
+    rigFile.set(key, null);
+    fetch(BASE + key + '/rigg.json' + BUST)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j && Array.isArray(j.deler)) rigFile.set(key, j); })
+      .catch(() => { /* finnes ikke - helt greit */ });
+  }
+  return rigFile.get(key);
+}
+
 export function drawRig(ctx, rig, s) {
+  const egen = customRig(rig);
+  if (egen) rig = Object.assign({}, rig, egen);
   const base = rig.mappe;
 
-  // --- Nivaa 1: separate deler ---
+  // --- Plassert rigg: hver del er sitt eget bilde, og riggen sier hvor
+  //     paa figuren den hoerer hjemme. Brukes naar delene er tegnet hver
+  //     for seg i stedet for som lag oppaa hverandre. ---
+  if (rig.plassert) return drawPlaced(ctx, rig, s);
+
+  // --- Nivaa 1: separate deler paa felles lerret ---
   const bodyPath = partPath(rig, base, 'kropp', s.variants);
   const bodyImg = bodyPath && tex(bodyPath);
   if (bodyImg) {
@@ -202,6 +227,100 @@ export function drawRig(ctx, rig, s) {
   return false; // ingen PNG - spillet tegner selv
 }
 
+/**
+ * Plassert rigg - for deler som er tegnet hver for seg i hvert sitt bilde.
+ * Hver del festes med et LEDD: du sier hvor leddet er i bildet, og hvor det
+ * leddet sitter paa figuren. Da faller alt paa plass av seg selv.
+ *
+ *   fest:    [x, y]  hvor leddet er i delens eget bilde (0-1)
+ *   paa:     [x, y]  hvor det leddet sitter paa figuren. Andel av
+ *                    figurhoeyden, (0,0) er midt mellom foettene, y opp = minus
+ *   h:       hoeyde paa delen, andel av figurhoeyden
+ *   omkring: [x, y]  roter om et annet punkt enn leddet (f.eks. vaapen som
+ *                    skal svinge om skulderen, ikke om haanda)
+ *   speil:   true    speilvend delen
+ *   vinkel:  fast helning i radianer
+ *   krever:  'kanon' vis delen foerst naar den oppgraderingen er kjoept
+ */
+/**
+ * Regner ut hvor hver del havner. Brukes baade av spillet og av
+ * rigg-redigereren (verktoy/rigger.html), saa de aldri kommer i utakt.
+ */
+export function placedLayout(rig, s) {
+  const H = s.h;
+  const base = rig.mappe;
+  const out = [];
+  let waiting = false;
+  for (const p of rig.deler) {
+    if (p.av) continue;
+    if (p.krever && !(s.variants && (s.variants[p.krever] | 0) > 0)) continue;
+    const path = partPath(rig, base, p.navn, s.variants);
+    const img = p.bilde || tex(path);
+    if (!img) { if (pending(path)) waiting = true; continue; }
+    const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+    const ph = H * (p.h || 0.4);
+    const pw = ph * (iw / ih);
+    const paa = p.paa || [0, -0.5];
+    const om = p.omkring;
+    const move = MOVES[p.beveg || 'ingen'] || MOVES.ingen;
+    const m = move(p, s) || {};
+    out.push({
+      p, img, pw, ph,
+      jx: p.fest ? p.fest[0] : 0.5,
+      jy: p.fest ? p.fest[1] : 0.5,
+      ax: paa[0] * H, ay: paa[1] * H,
+      rx: (om ? om[0] : paa[0]) * H, ry: (om ? om[1] : paa[1]) * H,
+      rot: (p.vinkel || 0) + (m.rot || 0),
+      dx: (m.dx || 0) * H, dy: (m.dy || 0) * H,
+    });
+  }
+  out.sort((a, b) => (a.p.z || 0) - (b.p.z || 0));
+  out.waiting = waiting;
+  return out;
+}
+
+/** Tegner en ferdig utregnet del. */
+export function paintPart(c, L) {
+  c.save();
+  c.translate(L.dx, L.dy);
+  if (L.rot) { c.translate(L.rx, L.ry); c.rotate(L.rot); c.translate(-L.rx, -L.ry); }
+  c.translate(L.ax, L.ay);
+  if (L.p.speil) c.scale(-1, 1);
+  c.drawImage(L.img, -L.jx * L.pw, -L.jy * L.ph, L.pw, L.ph);
+  c.restore();
+}
+
+function drawPlaced(ctx, rig, s) {
+  const H = s.h;
+  const layout = placedLayout(rig, s);
+  if (!layout.length) return false;
+  const paint = (c) => { for (const L of layout) paintPart(c, L); };
+
+  if (s.flash) {
+    const bw = H * 1.9, bh = H * 1.7;
+    const ox = bw * 0.5, oy = bh * 0.85;       // der foettene staar i lerretet
+    const sc = scratch(bw, bh);
+    sc.clearRect(0, 0, bw, bh);
+    sc.save();
+    sc.translate(ox, oy);
+    sc.scale(s.facing >= 0 ? 1 : -1, 1);
+    paint(sc);
+    sc.globalCompositeOperation = 'source-atop';
+    sc.fillStyle = 'rgba(255,255,255,0.8)';
+    sc.fillRect(-bw, -bh, bw * 2, bh * 2);
+    sc.restore();
+    sc.globalCompositeOperation = 'source-over';
+    ctx.drawImage(scratchCanvas, 0, 0, bw, bh, s.x - ox, s.y - oy, bw, bh);
+  } else {
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.scale(s.facing >= 0 ? 1 : -1, 1);
+    paint(ctx);
+    ctx.restore();
+  }
+  return true;
+}
+
 function drawPart(ctx, img, p, s, boxW, boxH) {
   const piv = p.dreiepunkt || PIVOT[p.navn] || [0.5, 0.5];
   // dreiepunktet i lokale koordinater (0,0 = midt under foettene)
@@ -239,15 +358,41 @@ function scratch(w, h) {
  *   arm-fram-kanon3.png -> -kanon2 -> -kanon1 -> arm-fram.png
  * Saa du kan lage bare en av dem, eller alle fem.
  */
+/**
+ * Vanlige alternative filnavn. Har du doept fila arm_foran.png i stedet for
+ * arm-fram.png finner spillet den likevel.
+ */
+const ALIAS = {
+  'arm-fram': ['arm_foran', 'arm-foran', 'arm_fram', 'arm_front'],
+  'arm-bak': ['arm_bak', 'arm-bakre'],
+  'bein-fram': ['fot_foran', 'fot-foran', 'bein_fram', 'fot_fram', 'ben-fram', 'ben_foran'],
+  'bein-bak': ['fot_bak', 'fot-bak', 'bein_bak', 'ben-bak', 'ben_bak'],
+  'vapen': ['canon', 'kanon', 'vaapen', 'gun'],
+  'rygg': ['jetpack', 'jet', 'ryggsekk'],
+  'hode': ['hodet', 'head'],
+  'kropp': ['body', 'torso'],
+  'hale': ['tail'],
+  'vinge-fram': ['vinge_foran', 'vinge-foran'],
+  'vinge-bak': ['vinge_bak'],
+};
+
 function partPath(rig, base, navn, variants) {
   const v = rig.variant && rig.variant[navn];
+  const names = [navn].concat(ALIAS[navn] || []);
   if (v && variants) {
     const lvl = variants[v] | 0;
     for (let i = lvl; i >= 1; i--) {
-      const p = base + '/' + navn + '-' + v + i + '.png';
-      if (tex(p)) return p;
-      if (pending(p)) return p; // vent til vi vet
+      for (const n of names) {
+        const p = base + '/' + n + '-' + v + i + '.png';
+        if (tex(p)) return p;
+        if (pending(p)) return p;   // vent til vi vet om den finnes
+      }
     }
+  }
+  for (const n of names) {
+    const p = base + '/' + n + '.png';
+    if (tex(p)) return p;
+    if (pending(p)) return p;
   }
   return base + '/' + navn + '.png';
 }
@@ -256,9 +401,11 @@ function partPath(rig, base, navn, variants) {
 export function rigPaths(rig, maxVariant = 5) {
   const out = [rig.mappe + '.png'];
   for (const p of rig.deler) {
-    out.push(rig.mappe + '/' + p.navn + '.png');
-    const v = rig.variant && rig.variant[p.navn];
-    if (v) for (let i = 1; i <= maxVariant; i++) out.push(rig.mappe + '/' + p.navn + '-' + v + i + '.png');
+    for (const n of [p.navn].concat(ALIAS[p.navn] || [])) {
+      out.push(rig.mappe + '/' + n + '.png');
+      const v = rig.variant && rig.variant[p.navn];
+      if (v) for (let i = 1; i <= maxVariant; i++) out.push(rig.mappe + '/' + n + '-' + v + i + '.png');
+    }
   }
   return out;
 }

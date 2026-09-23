@@ -93,11 +93,16 @@ du rører koden. Tre nivåer:
 
 **Full oppskrift med mål, festepunkter og filnavn: [art/LES-MEG.md](art/LES-MEG.md)**
 
-### Figurtesteren
+### Verktøy
 
-Åpne `verktoy/figurtest.html` mens serveren kjører. Den viser figuren stor og i
-bevegelse, lister opp hvilke filer den fant og hvilke som mangler, og lar deg dra
-i oppgraderingsnivåene for å se roboten bygge seg om.
+| | |
+|---|---|
+| **`verktoy/rigger.html`** | **Riggverkstedet** — dra hver kroppsdel på plass, sett leddene, roter og speilvend. Lagrer en `rigg.json` du legger i figurens mappe, så bruker spillet den med en gang. Du trenger ikke røre koden. |
+| `verktoy/figurtest.html` | Viser figuren stor og i bevegelse, og lister hvilke filer som ble funnet |
+| `node verktoy/fiks-figurer.js art` | Rydder opp i bildene: fjerner bakgrunn (også innbrent rutemønster), beskjærer og krymper. Originalene havner i `art/original/` |
+
+Delene trenger **ikke** ha samme størrelse eller samme plassering i bildet — tegn
+hver del for seg, og sett dem sammen i riggverkstedet.
 
 ---
 

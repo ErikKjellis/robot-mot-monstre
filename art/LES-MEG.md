@@ -4,9 +4,47 @@ Alle figurene i spillet kan byttes ut med PNG-bilder du lager selv.
 Du trenger ikke røre koden — legg fila på rett sted med rett navn, og spillet
 finner den. Finner det ingen fil, tegner spillet figuren selv som før.
 
-**Test alltid med figurtesteren:** åpne `verktoy/figurtest.html` i nettleseren.
-Den viser figuren stor, animerer den, og sier hvilke filer den fant og hvilke
-som mangler.
+## 🔧 Verktøyene — start her
+
+Kjør `node serve.js`, og åpne:
+
+| Verktøy | Hva den gjør |
+|---|---|
+| **`verktoy/rigger.html`** | **Riggverkstedet.** Dra hver kroppsdel på plass, sett leddene, roter, speilvend. Lagrer `rigg.json`. Det er her du bygger figuren. |
+| `verktoy/figurtest.html` | Viser figuren stor og i bevegelse, og lister hvilke filer som ble funnet |
+
+Og i terminalen:
+
+```bash
+node verktoy/fiks-figurer.js art
+```
+
+Den **rydder opp i bildene dine**: fjerner bakgrunnen (også det grå
+rutemønsteret mange tegneprogram brenner inn i bildet når du tror du lagrer
+gjennomsiktig), beskjærer bort tom plass, og krymper til 512 piksler.
+Originalene tas vare på i `art/original/`. Legg til `--paa-nytt` for å kjøre
+den om igjen på filer som alt er ryddet.
+
+---
+
+## To måter å bygge en figur på
+
+**A. Løse deler + riggverkstedet (enklest når du tegner hver del for seg)**
+
+Tegn hver kroppsdel som sitt eget bilde — hodet i ett bilde, armen i et annet.
+Størrelsen spiller ingen rolle, og de trenger ikke ligge på samme sted i bildet.
+Så åpner du `verktoy/rigger.html`, drar delene på plass, setter leddene, og
+trykker **Last ned rigg.json**. Legg fila i figurens mappe. Ferdig — spillet
+bruker den med en gang, uten at du rører koden.
+
+Dette er måten robot-delene og smådragen er bygget på.
+
+**B. Lag på felles lerret (hvis du tegner hele figuren i ett)**
+
+Tegn hele figuren, og lagre hvert lag som sin egen PNG i nøyaktig samme
+størrelse. Da faller alt på plass uten rigg-fil. Malen
+`art/maler/mal-tobeint.png` viser hvor leddene skal ligge. Resten av dette
+dokumentet beskriver denne måten.
 
 ---
 

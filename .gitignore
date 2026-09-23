@@ -2,3 +2,6 @@ node_modules/
 .DS_Store
 Thumbs.db
 *.log
+
+# originalbildene tas vare paa lokalt, men trengs ikke i repoet
+art/original/

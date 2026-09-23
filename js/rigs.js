@@ -22,9 +22,20 @@ const d = (navn, beveg, extra) => Object.assign({ navn, z: Z[navn] ?? 0, beveg }
 // Hver oppgradering kan bytte ut en kroppsdel. Kjoeper du kanon niva 3
 // leter spillet etter arm-fram-kanon3.png, saa -kanon2, -kanon1, og til
 // slutt arm-fram.png. Du kan altsaa lage bare en, eller alle fem.
+// Delene er tegnet hver for seg, saa riggen sier hvor paa roboten hver av
+// dem hoerer hjemme. Alle tall er andeler av robotens hoeyde, med (0,0) midt
+// mellom foettene og y negativt oppover.
+//   plass  { x, y, h }  senter og hoeyde paa delen
+//   anker  [x, y]       punktet delen roterer om (skulder, hofte, nakke)
+//   krever 'kanon'      delen vises foerst naar oppgraderingen er kjoept
+const SKULDER = [0.02, -0.72];   // der armene henger fast
+const HOFTE = [0.0, -0.46];      // der beina henger fast
+const HAAND_F = [0.20, -0.44];   // fremre haand
+const HAAND_B = [-0.14, -0.44];  // bakre haand
+
 export const ROBOT_RIG = {
   mappe: 'art/robot',
-  fyll: 1,
+  plassert: true,
   variant: {
     'kropp': 'panser',
     'hode': 'laser',
@@ -33,16 +44,43 @@ export const ROBOT_RIG = {
     'bein-bak': 'bein',
     'bein-fram': 'bein',
     'rygg': 'jet',
+    'vapen': 'kanon',
   },
   deler: [
-    d('rygg', 'ingen'),
-    d('bein-bak', 'gaa', { fase: Math.PI }),
-    d('arm-bak', 'slag'),
-    d('kropp', 'duv'),
-    d('bein-fram', 'gaa'),
-    d('hode', 'nikk'),
-    d('arm-fram', 'sikte'),
-    d('vapen', 'sikte'),
+    // jetpack paa ryggen - godt ut til venstre saa den stikker ut bak kroppen
+    { navn: 'rygg', z: -40, beveg: 'ingen', krever: 'jet', speil: true,
+      fest: [0.5, 0.5], paa: [-0.31, -0.66], h: 0.34 },
+
+    // bakre bein - hofteleddet er oeverst i bildet
+    { navn: 'bein-bak', z: -20, beveg: 'gaa', fase: Math.PI, styrke: 0.34,
+      fest: [0.55, 0.07], paa: [-0.10, -0.46], h: 0.50 },
+
+    // bakre arm - skulderen er oeverst i bildet
+    { navn: 'arm-bak', z: -10, beveg: 'slag',
+      fest: [0.55, 0.08], paa: [-0.12, -0.70], h: 0.42 },
+
+    // Hammeren holdes i bakre haand og svinger om skulderen. Den speilvendes
+    // saa hodet peker opp BAK roboten - ellers forsvinner den bak kroppen.
+    { navn: 'hammer', z: -8, beveg: 'slag', krever: 'hammer', speil: true,
+      fest: [0.12, 0.86], paa: [-0.20, -0.46], omkring: SKULDER, h: 0.50, vinkel: 0.25 },
+
+    // kroppen er tegnet med brystet mot venstre, saa den speilvendes
+    { navn: 'kropp', z: 0, beveg: 'duv', speil: true,
+      fest: [0.5, 0.5], paa: [0, -0.62], h: 0.42 },
+
+    { navn: 'bein-fram', z: 10, beveg: 'gaa', styrke: 0.34,
+      fest: [0.60, 0.07], paa: [0.08, -0.46], h: 0.50 },
+
+    { navn: 'hode', z: 20, beveg: 'nikk',
+      fest: [0.42, 0.92], paa: [0.02, -0.80], h: 0.28 },
+
+    // fremre arm - skulderen er oeverst til venstre i bildet
+    { navn: 'arm-fram', z: 30, beveg: 'sikte',
+      fest: [0.16, 0.10], paa: SKULDER, h: 0.44 },
+
+    // kanonen holdes i fremre haand og peker mot hoeyre
+    { navn: 'vapen', z: 35, beveg: 'sikte', krever: 'kanon',
+      fest: [0.12, 0.5], paa: HAAND_F, omkring: SKULDER, h: 0.19 },
   ],
 };
 
@@ -116,9 +154,35 @@ function klump(mappe, o = {}) {
 // Mappenavn = art/monstre/<noekkel>
 const M = (key, maker, o) => maker('art/monstre/' + key, o);
 
+/**
+ * Smaadragen er tegnet som loese deler, saa den bruker plassert rigg.
+ * Finjuster den i verktoy/rigger.html - da lagres art/monstre/smaadrage/rigg.json
+ * og den overstyrer disse tallene.
+ */
+const SMAADRAGE = {
+  mappe: 'art/monstre/smaadrage',
+  plassert: true,
+  deler: [
+    { navn: 'hale', z: -35, beveg: 'hale', styrke: 0.22,
+      fest: [0.94, 0.5], paa: [-0.26, -0.50], h: 0.22 },
+    { navn: 'bein-bak', z: -20, beveg: 'gaa', fase: Math.PI, styrke: 0.32,
+      fest: [0.50, 0.08], paa: [-0.10, -0.44], h: 0.54 },
+    { navn: 'arm-bak', z: -10, beveg: 'sving', styrke: 0.24,
+      fest: [0.50, 0.10], paa: [0.02, -0.58], h: 0.26 },
+    { navn: 'kropp', z: 0, beveg: 'duv',
+      fest: [0.5, 0.5], paa: [0, -0.46], h: 0.62 },
+    { navn: 'bein-fram', z: 10, beveg: 'gaa', styrke: 0.32,
+      fest: [0.45, 0.08], paa: [0.10, -0.42], h: 0.52 },
+    { navn: 'hode', z: 20, beveg: 'nikk',
+      fest: [0.08, 0.58], paa: [0.22, -0.70], h: 0.46 },
+    { navn: 'arm-fram', z: 30, beveg: 'sving', fase: 0, styrke: 0.24,
+      fest: [0.50, 0.12], paa: [0.18, -0.56], h: 0.20 },
+  ],
+};
+
 export const MONSTER_RIGS = {
   // smaa monstre
-  smaadrage:  M('smaadrage', tobeint),
+  smaadrage: SMAADRAGE,
   ildoegle:   M('ildoegle', firbeint),
   flygedrage: M('flygedrage', flygende, { fart: 10 }),
   steintroll: M('steintroll', klump),
