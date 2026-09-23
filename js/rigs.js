@@ -228,13 +228,33 @@ const ILDOEGLE = {
   ],
 };
 
+/** Isoegla gaar ogsaa paa fire, men har ingen hale. */
+const ISOEGLE = {
+  mappe: 'art/monstre/isoegle',
+  plassert: true,
+  deler: [
+    { navn: 'bein-bak', z: -25, beveg: 'gaa', fase: Math.PI, styrke: 0.3,
+      fest: [0.45, 0.08], paa: [-0.16, -0.52], h: 0.46 },
+    { navn: 'arm-bak', z: -15, beveg: 'gaa', fase: 0.6, styrke: 0.3,
+      fest: [0.55, 0.08], paa: [0.12, -0.50], h: 0.46 },
+    { navn: 'kropp', z: 0, beveg: 'duv', speil: true,
+      fest: [0.5, 0.5], paa: [0, -0.55], h: 0.32 },
+    { navn: 'bein-fram', z: 10, beveg: 'gaa', styrke: 0.3,
+      fest: [0.45, 0.08], paa: [-0.06, -0.50], h: 0.42 },
+    { navn: 'arm-fram', z: 20, beveg: 'gaa', fase: Math.PI + 0.6, styrke: 0.3,
+      fest: [0.45, 0.08], paa: [0.20, -0.48], h: 0.46 },
+    { navn: 'hode', z: 30, beveg: 'nikk',
+      fest: [0.12, 0.80], paa: [0.26, -0.64], h: 0.40 },
+  ],
+};
+
 export const MONSTER_RIGS = {
   // smaa monstre
   smaadrage: SMAADRAGE,
   flygedrage: FLYGEDRAGE,
   ildoegle: ILDOEGLE,
+  isoegle: ISOEGLE,
   steintroll: M('steintroll', klump),
-  isoegle:    M('isoegle', firbeint),
   skyggedrage: M('skyggedrage', flygende, { fart: 7 }),
 
   // sjefer
