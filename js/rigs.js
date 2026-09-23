@@ -206,11 +206,33 @@ const FLYGEDRAGE = {
   ],
 };
 
+/** Ildoeglen gaar paa fire - arm-delene er frambeina. Kroppen speilvendes. */
+const ILDOEGLE = {
+  mappe: 'art/monstre/ildoegle',
+  plassert: true,
+  deler: [
+    { navn: 'hale', z: -35, beveg: 'hale', styrke: 0.2,
+      fest: [0.95, 0.5], paa: [-0.28, -0.58], h: 0.16 },
+    { navn: 'bein-bak', z: -25, beveg: 'gaa', fase: Math.PI, styrke: 0.3,
+      fest: [0.50, 0.08], paa: [-0.18, -0.52], h: 0.50 },
+    { navn: 'arm-bak', z: -15, beveg: 'gaa', fase: 0.6, styrke: 0.3,
+      fest: [0.30, 0.12], paa: [0.14, -0.50], h: 0.44 },
+    { navn: 'kropp', z: 0, beveg: 'duv', speil: true,
+      fest: [0.5, 0.5], paa: [0, -0.58], h: 0.36 },
+    { navn: 'bein-fram', z: 10, beveg: 'gaa', styrke: 0.3,
+      fest: [0.50, 0.08], paa: [-0.08, -0.50], h: 0.50 },
+    { navn: 'arm-fram', z: 20, beveg: 'gaa', fase: Math.PI + 0.6, styrke: 0.3,
+      fest: [0.22, 0.18], paa: [0.22, -0.48], h: 0.44 },
+    { navn: 'hode', z: 30, beveg: 'nikk',
+      fest: [0.12, 0.78], paa: [0.28, -0.68], h: 0.44 },
+  ],
+};
+
 export const MONSTER_RIGS = {
   // smaa monstre
   smaadrage: SMAADRAGE,
   flygedrage: FLYGEDRAGE,
-  ildoegle:   M('ildoegle', firbeint),
+  ildoegle: ILDOEGLE,
   steintroll: M('steintroll', klump),
   isoegle:    M('isoegle', firbeint),
   skyggedrage: M('skyggedrage', flygende, { fart: 7 }),

@@ -49,6 +49,12 @@
         border:4px dashed var(--blue);display:none;align-items:center;justify-content:center;
         font-size:22px;font-weight:bold;pointer-events:none}
   #drop.on{display:flex}
+  #warn{position:absolute;left:12px;right:12px;top:12px;background:#4a2a12;
+        border:3px solid var(--yellow);border-radius:11px;padding:9px 13px;
+        font-size:13px;line-height:1.5;display:none}
+  #warn.on{display:block}
+  #warn b{color:var(--yellow)}
+  #warn code{background:rgba(0,0,0,.35);padding:1px 5px;border-radius:4px}
 </style>
 </head>
 <body>
@@ -60,6 +66,7 @@
 <div class="wrap">
   <div class="stage">
     <canvas id="c"></canvas>
+    <div id="warn"></div>
     <div id="drop">Slipp PNG-filer her</div>
   </div>
 
@@ -363,6 +370,38 @@ function layout() {
   return placedLayout(rig, state());
 }
 
+// --- Advarsel hvis bildene fortsatt har bakgrunn -------------------
+// Er alle fire hjoerner ugjennomsiktige, er bakgrunnen brent inn i bildet.
+const probe = document.createElement('canvas');
+probe.width = probe.height = 3;
+const pctx = probe.getContext('2d', { willReadFrequently: true });
+const sjekket = new Map();
+function harBakgrunn(img) {
+  const key = img.src || img;
+  if (sjekket.has(key)) return sjekket.get(key);
+  let svar = false;
+  try {
+    pctx.clearRect(0, 0, 3, 3);
+    pctx.drawImage(img, 0, 0, 3, 3);
+    const d = pctx.getImageData(0, 0, 3, 3).data;
+    const hjorner = [0, 2, 6, 8].map((i) => d[i * 4 + 3]);
+    svar = hjorner.every((a) => a > 200);
+  } catch (e) { svar = false; }
+  sjekket.set(key, svar);
+  return svar;
+}
+
+function sjekkBakgrunn(L) {
+  const daarlige = L.filter((it) => harBakgrunn(it.img)).map((it) => it.p.navn);
+  const w = $('warn');
+  w.classList.toggle('on', daarlige.length > 0);
+  if (daarlige.length) {
+    w.innerHTML = '<b>⚠️ Bakgrunnen ligger fortsatt i bildet</b> på: ' +
+      daarlige.join(', ') + '.<br>Start serveren på nytt (<code>node serve.js</code>) — ' +
+      'den rydder bildene automatisk. Eller kjør <code>node verktoy/fiks-figurer.js art</code>.';
+  }
+}
+
 function draw() {
   const dpr = Math.min(devicePixelRatio || 1, 2);
   const w = c.clientWidth, h = c.clientHeight;
@@ -434,6 +473,7 @@ function draw() {
     ctx.fillStyle = '#ff9a3d'; ctx.font = 'bold 15px Verdana'; ctx.textAlign = 'center';
     ctx.fillText('Klikk der delen skal rotere om', w / 2, 30);
   }
+  sjekkBakgrunn(L);
 }
 
 // ---------------------------------------------------------------

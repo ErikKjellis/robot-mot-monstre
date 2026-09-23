@@ -296,8 +296,15 @@ function shrink(im, max) {
 //  Rydd en enkelt fil. Returnerer null hvis den alt var i orden.
 // ------------------------------------------------------------------
 function ryddFil(f, force) {
-  const rel = path.relative('art', f).replace(/\\/g, '/');
-  const backup = path.join('art', 'original', rel);
+  // Finn art-mappa ut fra selve fila, ikke ut fra hvor kommandoen ble kjoert.
+  // Ellers havner sikkerhetskopiene feil naar serveren startes fra en annen mappe.
+  let artRot = path.dirname(path.resolve(f));
+  while (path.basename(artRot) !== 'art' && path.dirname(artRot) !== artRot) {
+    artRot = path.dirname(artRot);
+  }
+  if (path.basename(artRot) !== 'art') artRot = path.dirname(path.resolve(f));
+  const rel = path.relative(artRot, path.resolve(f)).replace(/\\/g, '/');
+  const backup = path.join(artRot, 'original', rel);
   const before = fs.statSync(f).size;
   let im = decode(f);
   const removed = stripBackground(im);
