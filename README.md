@@ -99,10 +99,18 @@ du rører koden. Tre nivåer:
 |---|---|
 | **`verktoy/rigger.html`** | **Riggverkstedet** — dra hver kroppsdel på plass, sett leddene, roter og speilvend. Lagrer en `rigg.json` du legger i figurens mappe, så bruker spillet den med en gang. Du trenger ikke røre koden. |
 | `verktoy/figurtest.html` | Viser figuren stor og i bevegelse, og lister hvilke filer som ble funnet |
-| `node verktoy/fiks-figurer.js art` | Rydder opp i bildene: fjerner bakgrunn (også innbrent rutemønster), beskjærer og krymper. Originalene havner i `art/original/` |
+| `node verktoy/fiks-figurer.js art` | Samme opprydding for hånd (`serve.js` gjør det automatisk) |
 
 Delene trenger **ikke** ha samme størrelse eller samme plassering i bildet — tegn
 hver del for seg, og sett dem sammen i riggverkstedet.
+
+**`node serve.js` rydder bildene automatisk** — både ved oppstart og når du
+legger nye PNG-er i `art/` mens den kjører. Bakgrunnen fjernes (også det grå
+rutemønsteret tegneprogrammer brenner inn i bildet), bildet beskjæres og
+krympes. Originalene tas vare på i `art/original/`.
+
+**Husk mappa:** monstre skal ligge i `art/monstre/<navn>/`, ikke rett i `art/`.
+Roboten ligger i `art/robot/`.
 
 ---
 

@@ -13,17 +13,39 @@ Kjør `node serve.js`, og åpne:
 | **`verktoy/rigger.html`** | **Riggverkstedet.** Dra hver kroppsdel på plass, sett leddene, roter, speilvend. Lagrer `rigg.json`. Det er her du bygger figuren. |
 | `verktoy/figurtest.html` | Viser figuren stor og i bevegelse, og lister hvilke filer som ble funnet |
 
-Og i terminalen:
+### Bildene ryddes av seg selv
+
+`node serve.js` **rydder opp i bildene automatisk** — både når den starter og
+når du legger nye PNG-er i `art/` mens den kjører. Den fjerner bakgrunnen (også
+det grå rutemønsteret mange tegneprogram brenner inn i bildet når du tror du
+lagrer gjennomsiktig), beskjærer bort tom plass og krymper til 512 piksler.
+Du ser det i terminalvinduet:
+
+```
+Ny figurdel funnet:
+  ryddet monstre/flygedrage/hode.png  449 kB -> 512x363 285 kB
+```
+
+Originalene tas vare på i `art/original/`, så ingenting går tapt. Trenger du å
+kjøre den for hånd går det også:
 
 ```bash
 node verktoy/fiks-figurer.js art
 ```
 
-Den **rydder opp i bildene dine**: fjerner bakgrunnen (også det grå
-rutemønsteret mange tegneprogram brenner inn i bildet når du tror du lagrer
-gjennomsiktig), beskjærer bort tom plass, og krymper til 512 piksler.
-Originalene tas vare på i `art/original/`. Legg til `--paa-nytt` for å kjøre
-den om igjen på filer som alt er ryddet.
+### ⚠️ Legg mappa på rett sted
+
+Monstre skal ligge i **`art/monstre/<navn>/`** — ikke rett i `art/`.
+Navnet må være ett av dem i tabellen lenger ned (`flygedrage`, `isoegle` …).
+Ligger mappa feil, finner ikke spillet den, og da blir figuren tegnet med
+spillets egen strek i stedet.
+
+```
+art/monstre/flygedrage/kropp.png     ✅
+art/flygedrage/kropp.png             ❌ spillet leter ikke her
+```
+
+Roboten er det eneste unntaket: den ligger i `art/robot/`.
 
 ---
 

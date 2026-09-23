@@ -156,10 +156,17 @@ function stripBackground(im) {
     push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1);
   }
 
+  // Tell BARE piksler som faktisk var synlige foer. Ellers ville et bilde
+  // som allerede er ryddet se ut som om vi fjernet halve bakgrunnen paa nytt,
+  // og da ville det blitt beskaaret og mykt i kantene om og om igjen.
   let removed = 0;
   for (let k = 0; k < w * h; k++) {
-    if (bg[k]) { px[k * 4 + 3] = 0; removed++; }
+    if (!bg[k]) continue;
+    if (px[k * 4 + 3] > 8) removed++;
+    px[k * 4 + 3] = 0;
   }
+  const andel = removed / (w * h);
+  if (andel < 0.005) return andel;   // alt var gjennomsiktig fra foer
 
   // Mykne kanten: piksler som ligger inntil bakgrunnen og er lyse er
   // halvveis bakgrunn (kantutjevning fra tegneprogrammet).
@@ -183,7 +190,7 @@ function stripBackground(im) {
       px[i + 3] = Math.round(px[i + 3] * (1 - t));
     }
   }
-  return removed / (w * h);
+  return andel;
 }
 
 // ------------------------------------------------------------------
@@ -286,46 +293,76 @@ function shrink(im, max) {
 }
 
 // ------------------------------------------------------------------
-const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
-const force = process.argv.includes('--paa-nytt');
-const target = args[0] || 'art';
-const files = [];
-(function walk(d) {
-  for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-    const p = path.join(d, e.name);
-    if (e.isDirectory()) { if (e.name !== 'original') walk(p); }
-    else if (e.name.toLowerCase().endsWith('.png')) files.push(p);
-  }
-})(target);
-
-let totalBefore = 0, totalAfter = 0, done = 0;
-for (const f of files) {
+//  Rydd en enkelt fil. Returnerer null hvis den alt var i orden.
+// ------------------------------------------------------------------
+function ryddFil(f, force) {
   const rel = path.relative('art', f).replace(/\\/g, '/');
   const backup = path.join('art', 'original', rel);
-  try {
-    const before = fs.statSync(f).size;
-    let im = decode(f);
-    const removed = stripBackground(im);
-    const flekker = despeckle(im);
-    if (!force && removed < 0.02 && !flekker && Math.max(im.w, im.h) <= MAX_SIZE) {
-      console.log('  hopper over (allerede ryddet): ' + rel);
-      continue;
-    }
-    im = crop(im);
-    im = shrink(im, MAX_SIZE);
-    const out = encode(im);
-    fs.mkdirSync(path.dirname(backup), { recursive: true });
-    if (!fs.existsSync(backup)) fs.copyFileSync(f, backup);
-    fs.writeFileSync(f, out);
-    totalBefore += before; totalAfter += out.length; done++;
-    console.log('  ' + rel.padEnd(34) +
-      (Math.round(before / 1024) + ' kB').padStart(9) + '  ->  ' +
-      (im.w + 'x' + im.h).padStart(9) + '  ' + (Math.round(out.length / 1024) + ' kB').padStart(8) +
-      '   (' + Math.round(removed * 100) + '% bakgrunn fjernet)');
-  } catch (e) {
-    console.log('  HOPPET OVER ' + rel + ': ' + e.message);
-  }
+  const before = fs.statSync(f).size;
+  let im = decode(f);
+  const removed = stripBackground(im);
+  const flekker = despeckle(im);
+  if (!force && removed < 0.02 && !flekker && Math.max(im.w, im.h) <= MAX_SIZE) return null;
+  im = crop(im);
+  im = shrink(im, MAX_SIZE);
+  const out = encode(im);
+  fs.mkdirSync(path.dirname(backup), { recursive: true });
+  if (!fs.existsSync(backup)) fs.copyFileSync(f, backup);
+  fs.writeFileSync(f, out);
+  return { rel, before, after: out.length, w: im.w, h: im.h, removed };
 }
-console.log('\n' + done + ' filer ryddet.  ' +
-  (totalBefore / 1048576).toFixed(1) + ' MB -> ' + (totalAfter / 1048576).toFixed(2) + ' MB');
-console.log('Originalene ligger i art/original/');
+
+function finnPngFiler(dir) {
+  const files = [];
+  (function walk(d) {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) { if (e.name !== 'original') walk(p); }
+      else if (e.name.toLowerCase().endsWith('.png')) files.push(p);
+    }
+  })(dir);
+  return files;
+}
+
+/** Rydder en hel mappe. Returnerer liste over det som faktisk ble endret. */
+function ryddMappe(dir, opt = {}) {
+  const ut = [];
+  for (const f of finnPngFiler(dir)) {
+    try {
+      const r = ryddFil(f, opt.force);
+      if (r) ut.push(r);
+    } catch (e) {
+      ut.push({ rel: path.relative('art', f).replace(/\\/g, '/'), feil: e.message });
+    }
+  }
+  return ut;
+}
+
+module.exports = { ryddFil, ryddMappe, finnPngFiler };
+
+// ------------------------------------------------------------------
+//  Kommandolinje
+// ------------------------------------------------------------------
+if (require.main === module) {
+  const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+  const force = process.argv.includes('--paa-nytt');
+  const target = args[0] || 'art';
+  let totalBefore = 0, totalAfter = 0, done = 0;
+  for (const f of finnPngFiler(target)) {
+    const rel = path.relative('art', f).replace(/\\/g, '/');
+    try {
+      const r = ryddFil(f, force);
+      if (!r) { console.log('  hopper over (allerede ryddet): ' + rel); continue; }
+      totalBefore += r.before; totalAfter += r.after; done++;
+      console.log('  ' + r.rel.padEnd(34) +
+        (Math.round(r.before / 1024) + ' kB').padStart(9) + '  ->  ' +
+        (r.w + 'x' + r.h).padStart(9) + '  ' + (Math.round(r.after / 1024) + ' kB').padStart(8) +
+        '   (' + Math.round(r.removed * 100) + '% bakgrunn fjernet)');
+    } catch (e) {
+      console.log('  HOPPET OVER ' + rel + ': ' + e.message);
+    }
+  }
+  console.log('\n' + done + ' filer ryddet.  ' +
+    (totalBefore / 1048576).toFixed(1) + ' MB -> ' + (totalAfter / 1048576).toFixed(2) + ' MB');
+  console.log('Originalene ligger i art/original/');
+}

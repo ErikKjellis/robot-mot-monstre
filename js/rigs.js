@@ -180,11 +180,37 @@ const SMAADRAGE = {
   ],
 };
 
+/** Flygedragen - kroppen er tegnet med halsen mot venstre, saa den speilvendes. */
+const FLYGEDRAGE = {
+  mappe: 'art/monstre/flygedrage',
+  plassert: true,
+  deler: [
+    { navn: 'vinge-bak', z: -40, beveg: 'vinge', fart: 8, fase: 0.4, styrke: 0.5,
+      fest: [0.88, 0.86], paa: [-0.04, -0.72], h: 0.50 },
+    { navn: 'hale', z: -35, beveg: 'hale', styrke: 0.26,
+      fest: [0.96, 0.5], paa: [-0.30, -0.58], h: 0.13 },
+    { navn: 'bein-bak', z: -20, beveg: 'sving', styrke: 0.16,
+      fest: [0.50, 0.06], paa: [-0.10, -0.44], h: 0.34 },
+    { navn: 'arm-bak', z: -10, beveg: 'sving', styrke: 0.18,
+      fest: [0.50, 0.10], paa: [0.08, -0.54], h: 0.26 },
+    { navn: 'kropp', z: 0, beveg: 'duv', speil: true,
+      fest: [0.5, 0.5], paa: [0, -0.56], h: 0.30 },
+    { navn: 'bein-fram', z: 10, beveg: 'sving', fase: 0.6, styrke: 0.16,
+      fest: [0.50, 0.06], paa: [0.06, -0.42], h: 0.34 },
+    { navn: 'arm-fram', z: 15, beveg: 'sving', fase: 0.3, styrke: 0.18,
+      fest: [0.22, 0.22], paa: [0.18, -0.50], h: 0.24 },
+    { navn: 'hode', z: 20, beveg: 'nikk',
+      fest: [0.18, 0.80], paa: [0.30, -0.70], h: 0.46 },
+    { navn: 'vinge-fram', z: 40, beveg: 'vinge', fart: 8, styrke: 0.6,
+      fest: [0.88, 0.86], paa: [0.03, -0.70], h: 0.56 },
+  ],
+};
+
 export const MONSTER_RIGS = {
   // smaa monstre
   smaadrage: SMAADRAGE,
+  flygedrage: FLYGEDRAGE,
   ildoegle:   M('ildoegle', firbeint),
-  flygedrage: M('flygedrage', flygende, { fart: 10 }),
   steintroll: M('steintroll', klump),
   isoegle:    M('isoegle', firbeint),
   skyggedrage: M('skyggedrage', flygende, { fart: 7 }),
