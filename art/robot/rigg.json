@@ -1,0 +1,152 @@
+{
+  "plassert": true,
+  "deler": [
+    {
+      "navn": "rygg",
+      "z": -40,
+      "h": 0.58,
+      "fest": [
+        0.5,
+        0.5
+      ],
+      "paa": [
+        -0.135,
+        -0.585
+      ],
+      "beveg": "duv",
+      "speil": true,
+      "vinkel": 0.332,
+      "krever": "jet"
+    },
+    {
+      "navn": "bein-bak",
+      "z": -8,
+      "h": 0.5,
+      "fest": [
+        0.55,
+        0.07
+      ],
+      "paa": [
+        0.048,
+        -0.467
+      ],
+      "beveg": "gaa",
+      "fase": 3.142,
+      "styrke": 0.34
+    },
+    {
+      "navn": "arm-bak",
+      "z": 30,
+      "h": 0.51,
+      "fest": [
+        0.55,
+        0.08
+      ],
+      "paa": [
+        -0.205,
+        -0.724
+      ],
+      "beveg": "slag",
+      "vinkel": -0.768
+    },
+    {
+      "navn": "hammer",
+      "z": -20,
+      "h": 0.34,
+      "fest": [
+        0.12,
+        0.86
+      ],
+      "paa": [
+        -0.081,
+        -0.453
+      ],
+      "beveg": "slag",
+      "speil": true,
+      "vinkel": -2.007,
+      "omkring": [
+        -0.082,
+        -0.456
+      ],
+      "krever": "hammer"
+    },
+    {
+      "navn": "kropp",
+      "z": 10,
+      "h": 0.42,
+      "fest": [
+        0.5,
+        0.5
+      ],
+      "paa": [
+        0.034,
+        -0.622
+      ],
+      "beveg": "duv",
+      "speil": true
+    },
+    {
+      "navn": "bein-fram",
+      "z": -10,
+      "h": 0.5,
+      "fest": [
+        0.6,
+        0.07
+      ],
+      "paa": [
+        0.165,
+        -0.482
+      ],
+      "beveg": "gaa",
+      "styrke": 0.34
+    },
+    {
+      "navn": "hode",
+      "z": 35,
+      "h": 0.28,
+      "fest": [
+        0.42,
+        0.92
+      ],
+      "paa": [
+        0.044,
+        -0.786
+      ],
+      "beveg": "nikk"
+    },
+    {
+      "navn": "arm-fram",
+      "z": 0,
+      "h": 0.38,
+      "fest": [
+        0.16,
+        0.1
+      ],
+      "paa": [
+        0.16,
+        -0.744
+      ],
+      "beveg": "sikte",
+      "vinkel": 0.105
+    },
+    {
+      "navn": "vapen",
+      "z": 20,
+      "h": 0.19,
+      "fest": [
+        0.12,
+        0.5
+      ],
+      "paa": [
+        0.069,
+        -0.447
+      ],
+      "beveg": "sikte",
+      "omkring": [
+        0.02,
+        -0.72
+      ],
+      "krever": "kanon"
+    }
+  ]
+}
