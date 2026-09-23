@@ -228,11 +228,13 @@ const ILDOEGLE = {
   ],
 };
 
-/** Isoegla gaar ogsaa paa fire, men har ingen hale. */
+/** Isoegla gaar ogsaa paa fire. */
 const ISOEGLE = {
   mappe: 'art/monstre/isoegle',
   plassert: true,
   deler: [
+    { navn: 'hale', z: -35, beveg: 'hale', styrke: 0.2,
+      fest: [0.95, 0.5], paa: [-0.26, -0.56], h: 0.15 },
     { navn: 'bein-bak', z: -25, beveg: 'gaa', fase: Math.PI, styrke: 0.3,
       fest: [0.45, 0.08], paa: [-0.16, -0.52], h: 0.46 },
     { navn: 'arm-bak', z: -15, beveg: 'gaa', fase: 0.6, styrke: 0.3,
