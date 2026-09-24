@@ -18,9 +18,15 @@ const ROOT = __dirname;
 const ART = path.join(ROOT, 'art');
 
 function fortell(r) {
-  if (r.feil) console.log('  ! ' + r.rel + ': ' + r.feil);
-  else console.log('  ryddet ' + r.rel + '  ' + Math.round(r.before / 1024) + ' kB -> ' +
+  if (r.feil) { console.log('  ! ' + r.rel + ': ' + r.feil); return; }
+  console.log('  ryddet ' + r.rel + '  ' + Math.round(r.before / 1024) + ' kB -> ' +
     r.w + 'x' + r.h + ' ' + Math.round(r.after / 1024) + ' kB');
+  if (r.erArk) {
+    console.log('    ^ dette ser ut som et DELARK med flere kroppsdeler.');
+    console.log('      Opploesningen er beholdt. Del det opp med:');
+    console.log('      node verktoy/del-opp.js ' + path.join('art', r.rel).replace(/\\/g, '/') +
+      ' art/monstre/<navn> <delnavn i rekkefoelge>');
+  }
 }
 
 if (fs.existsSync(ART)) {

@@ -224,7 +224,7 @@ function despeckle(im) {
     }
     sizes.push(n);
   }
-  if (!sizes.length) return 0;
+  if (!sizes.length) return { fjernet: 0, biter: 0 };
   const biggest = Math.max(...sizes);
   const min = biggest * 0.04;
   let killed = 0;
@@ -233,7 +233,11 @@ function despeckle(im) {
     if (id >= 0 && sizes[id] < min) { px[k * 4 + 3] = 0; killed++; }
     else if (id < 0 && px[k * 4 + 3] > 0 && px[k * 4 + 3] <= 40) px[k * 4 + 3] = 0;
   }
-  return killed;
+  // Hvor mange tydelige biter ble igjen? Er det mange, er dette et delark
+  // og ikke en enkelt kroppsdel.
+  const alt = sizes.reduce((s, n) => s + n, 0);
+  const biter = sizes.filter((n) => n >= min && n >= alt * 0.03).length;
+  return { fjernet: killed, biter };
 }
 
 // ------------------------------------------------------------------
@@ -308,15 +312,18 @@ function ryddFil(f, force) {
   const before = fs.statSync(f).size;
   let im = decode(f);
   const removed = stripBackground(im);
-  const flekker = despeckle(im);
-  if (!force && removed < 0.02 && !flekker && Math.max(im.w, im.h) <= MAX_SIZE) return null;
+  const { fjernet, biter } = despeckle(im);
+  // Flere tydelige biter = et delark med mange kroppsdeler. Da beholder vi
+  // oppløsningen, ellers blir hver del bitteliten naar arket krympes til 512.
+  const erArk = biter >= 3;
+  if (!force && removed < 0.02 && !fjernet && (erArk || Math.max(im.w, im.h) <= MAX_SIZE)) return null;
   im = crop(im);
-  im = shrink(im, MAX_SIZE);
+  if (!erArk) im = shrink(im, MAX_SIZE);
   const out = encode(im);
   fs.mkdirSync(path.dirname(backup), { recursive: true });
   if (!fs.existsSync(backup)) fs.copyFileSync(f, backup);
   fs.writeFileSync(f, out);
-  return { rel, before, after: out.length, w: im.w, h: im.h, removed };
+  return { rel, before, after: out.length, w: im.w, h: im.h, removed, erArk };
 }
 
 function finnPngFiler(dir) {

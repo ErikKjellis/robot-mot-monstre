@@ -270,14 +270,39 @@ const KOLOSSEN = {
   ],
 };
 
+/**
+ * Skyggedragen. Halen og vingene er tegnet med festet mot venstre, saa de
+ * speilvendes for aa svinge bakover naar dragen ser mot hoeyre.
+ */
+const SKYGGEDRAGE = {
+  mappe: 'art/monstre/skyggedrage',
+  plassert: true,
+  deler: [
+    { navn: 'vinge-bak', z: -40, beveg: 'vinge', fart: 7, fase: 0.4, styrke: 0.42,
+      speil: true, fest: [0.07, 0.74], paa: [-0.04, -0.66], h: 0.40 },
+    { navn: 'hale', z: -35, beveg: 'hale', styrke: 0.24, speil: true,
+      fest: [0.05, 0.5], paa: [-0.13, -0.50], h: 0.13 },
+    { navn: 'bein-bak', z: -20, beveg: 'sving', styrke: 0.18,
+      fest: [0.50, 0.08], paa: [-0.04, -0.36], h: 0.30 },
+    { navn: 'kropp', z: 0, beveg: 'duv',
+      fest: [0.5, 0.5], paa: [0, -0.52], h: 0.38 },
+    { navn: 'bein-fram', z: 10, beveg: 'sving', fase: 0.6, styrke: 0.18,
+      fest: [0.50, 0.08], paa: [0.08, -0.34], h: 0.30 },
+    { navn: 'hode', z: 20, beveg: 'nikk',
+      fest: [0.14, 0.80], paa: [0.23, -0.62], h: 0.32 },
+    { navn: 'vinge-fram', z: 40, beveg: 'vinge', fart: 7, styrke: 0.5,
+      speil: true, fest: [0.07, 0.74], paa: [0.03, -0.63], h: 0.44 },
+  ],
+};
+
 export const MONSTER_RIGS = {
   // smaa monstre
   smaadrage: SMAADRAGE,
+  skyggedrage: SKYGGEDRAGE,
   flygedrage: FLYGEDRAGE,
   ildoegle: ILDOEGLE,
   isoegle: ISOEGLE,
   steintroll: M('steintroll', klump),
-  skyggedrage: M('skyggedrage', flygende, { fart: 7 }),
 
   // sjefer
   godzaur:     M('godzaur', tobeint),
