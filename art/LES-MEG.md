@@ -51,15 +51,18 @@ Roboten er det eneste unntaket: den ligger i `art/robot/`.
 
 ## To måter å bygge en figur på
 
-**A. Løse deler + riggverkstedet (enklest når du tegner hver del for seg)**
+**A. Løse deler + riggverkstedet ← dette er måten figurene i spillet er laget på**
 
 Tegn hver kroppsdel som sitt eget bilde — hodet i ett bilde, armen i et annet.
-Størrelsen spiller ingen rolle, og de trenger ikke ligge på samme sted i bildet.
-Så åpner du `verktoy/rigger.html`, drar delene på plass, setter leddene, og
-trykker **Last ned rigg.json**. Legg fila i figurens mappe. Ferdig — spillet
+**Størrelsen spiller ingen rolle**, og delene trenger ikke ligge på samme sted i
+bildet. Så åpner du `verktoy/rigger.html`, drar delene på plass, setter leddene,
+og trykker **Last ned rigg.json**. Legg fila i figurens mappe. Ferdig — spillet
 bruker den med en gang, uten at du rører koden.
 
-Dette er måten robot-delene og smådragen er bygget på.
+> **Lager du bildene med en bilde-AI?** Bruk [AI-OPPSKRIFT.md](AI-OPPSKRIFT.md).
+> Den er skrevet for å limes rett inn til AI-en, og tar med det som pleier å gå
+> galt. Send **ikke** med denne fila eller malen — de fire reglene under gjelder
+> bare måte B.
 
 **B. Lag på felles lerret (hvis du tegner hele figuren i ett)**
 
@@ -108,7 +111,12 @@ innebygde utseendet.
 
 ---
 
-## Slik skal bildene lages
+## Slik skal bildene lages — måte B (felles lerret)
+
+> ⚠️ **Disse fire reglene gjelder BARE måte B**, altså når du tegner hele
+> figuren i ett og lagrer lag for lag. Bruker du riggverkstedet (måte A),
+> spiller verken størrelse, beskjæring eller plassering i bildet noen rolle —
+> se [AI-OPPSKRIFT.md](AI-OPPSKRIFT.md) i stedet.
 
 Det er fire regler. Følg dem, så sitter alt på plass av seg selv.
 

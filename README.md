@@ -93,6 +93,9 @@ du rører koden. Tre nivåer:
 
 **Full oppskrift med mål, festepunkter og filnavn: [art/LES-MEG.md](art/LES-MEG.md)**
 
+**Lager du bildene med en bilde-AI? [art/AI-OPPSKRIFT.md](art/AI-OPPSKRIFT.md)**
+er skrevet for å limes rett inn til AI-en.
+
 ### Verktøy
 
 | | |
