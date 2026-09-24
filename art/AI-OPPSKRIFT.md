@@ -184,3 +184,84 @@ laget med rutemønster — be om hvit bakgrunn og prøv på nytt.
 | Stilen driver mellom delene | Be om alle delene i **ett** bilde. |
 | Figuren ser mot venstre | «Alt sett fra siden, vendt mot **høyre**.» |
 | Lyse felter blir spist opp i spillet | «Tykk mørk kontur **hele veien rundt**, også rundt hvite felter.» |
+
+---
+
+## Klare kall — kopier og lim inn
+
+Ett kall per monster. Etterpå deler du arket opp med kommandoen under hvert av
+dem. Rekkefølgen på delnavnene MÅ stemme med rekkefølgen i prompten.
+
+To ting er lagt inn her som sparte mye etterarbeid på skyggedragen:
+**kroppen skal ha halsåpningen til HØYRE og haleflekken til VENSTRE**, og
+**halen skal være tykk til høyre og smalne mot venstre**. Da peker alt riktig
+vei med en gang, og du slipper å speilvende i riggverkstedet.
+
+### 🦖 Godzaur — sjef, nivå 1
+
+```
+GetImageGeneration(size = square, description = Character parts sheet for a 2D side-scroller game: SEVEN separate body parts of one giant green kaiju lizard, laid out well apart from each other on a PLAIN WHITE background. Polished cartoon 2D game art, thick dark-navy outline all the way around every part, flat cel shading, light from upper left. THE CREATURE: a hulking godzilla-like kaiju - heavy chest, thick legs, small clawed arms, jagged plates down the spine, broad jaw with blunt teeth. Powerful and impressive but not frightening, this is the first boss a child meets. Colours: dark green #23512d, grass green #4f8f5a, light green #7dc98a, pale beige belly #d9d2ae. LAY OUT IN THIS ORDER, left to right, top row first: 1 torso only with no head no limbs no tail, with the neck opening at its RIGHT end and the tail socket at its LEFT end, 2 head with neck facing RIGHT, 3 full tail thick at its RIGHT end and tapering to the tip at the LEFT, 4 near small clawed arm with shoulder joint at top, 5 far small clawed arm slightly darker, 6 near hind leg with clawed foot and hip joint at top, 7 far hind leg slightly darker for depth. RULES: PLAIN WHITE background - not a checkerboard, not transparent, no gradient. Wide clear gaps between the parts, nothing touching or overlapping. Every part detached as if taken off the figure, with a clean rounded stump where it attaches. All parts in side view facing RIGHT. Thick dark outline completely around every part including around any light areas. No assembled creature, no background scenery, no ground, no shadow under the parts, no text, labels, numbers, grid, guides, frames or watermark. Leave margin around everything - no part may touch the image edge.)
+```
+
+```bash
+node verktoy/del-opp.js ark/godzaur.png art/monstre/godzaur kropp hode hale arm-fram arm-bak bein-fram bein-bak
+```
+
+### 🐉 Røddragen — sjef, nivå 2
+
+```
+GetImageGeneration(size = square, description = Character parts sheet for a 2D side-scroller game: SEVEN separate body parts of one furious red flying dragon, laid out well apart from each other on a PLAIN WHITE background. Polished cartoon 2D game art, thick dark-navy outline all the way around every part, flat cel shading, light from upper left. THE DRAGON: a furious red dragon with a huge wingspan, horns swept back, and fire glowing in its throat. Colours: deep red #8c1c14, fire red #e04b3a, orange glow #ff9a3d, dark bone white #e8dcc0. LAY OUT IN THIS ORDER, left to right, top row first: 1 torso only with no head no limbs no wings no tail, with the neck opening at its RIGHT end and the tail socket at its LEFT end, 2 head with neck facing RIGHT, 3 full tail thick at its RIGHT end and tapering to the tip at the LEFT, 4 near wing spread open with the shoulder end at the RIGHT and the membrane spreading up and to the LEFT, 5 far wing same shape slightly darker, 6 near hind leg with clawed foot and hip joint at top, 7 far hind leg slightly darker for depth. RULES: PLAIN WHITE background - not a checkerboard, not transparent, no gradient. Wide clear gaps between the parts, nothing touching or overlapping. Every part detached as if taken off the figure, with a clean rounded stump where it attaches. All parts in side view facing RIGHT. Thick dark outline completely around every part including around any light areas. No assembled dragon, no background scenery, no ground, no shadow under the parts, no text, labels, numbers, grid, guides, frames or watermark. Leave margin around everything - no part may touch the image edge.)
+```
+
+```bash
+node verktoy/del-opp.js ark/roddrage.png art/monstre/roddrage kropp hode hale vinge-fram vinge-bak bein-fram bein-bak
+```
+
+### 🐍 Hydra — sjef, nivå 3
+
+```
+GetImageGeneration(size = square, description = Character parts sheet for a 2D side-scroller game: SEVEN separate body parts of one three-headed hydra, laid out well apart from each other on a PLAIN WHITE background. Polished cartoon 2D game art, thick dark-navy outline all the way around every part, flat cel shading, light from upper left. THE CREATURE: a heavy green-teal serpent beast with three snake heads on long necks, scaly hide and a pale belly. Colours: dark sea green #1a6b4d, jade green #3fb98a, light mint #8ef0c0, yellow-white belly #e6e2b8. LAY OUT IN THIS ORDER, left to right, top row first: 1 torso only with no heads no limbs no tail, with the neck opening at its RIGHT end and the tail socket at its LEFT end, 2 ALL THREE heads together with their three necks joined at one shared base, drawn as ONE single connected piece facing RIGHT, 3 full tail thick at its RIGHT end and tapering to the tip at the LEFT, 4 near clawed arm with shoulder joint at top, 5 far clawed arm slightly darker, 6 near hind leg with clawed foot and hip joint at top, 7 far hind leg slightly darker for depth. RULES: PLAIN WHITE background - not a checkerboard, not transparent, no gradient. Wide clear gaps between the parts, nothing touching or overlapping. The three heads must stay joined to each other as one single piece, but must not touch any other part. Every part detached as if taken off the figure, with a clean rounded stump where it attaches. All parts in side view facing RIGHT. Thick dark outline completely around every part including around any light areas. No assembled creature, no background scenery, no ground, no shadow under the parts, no text, labels, numbers, grid, guides, frames or watermark. Leave margin around everything - no part may touch the image edge.)
+```
+
+```bash
+node verktoy/del-opp.js ark/hydra.png art/monstre/hydra kropp hode hale arm-fram arm-bak bein-fram bein-bak
+```
+
+### ❄️ Frostdragen — sjef, nivå 4
+
+```
+GetImageGeneration(size = square, description = Character parts sheet for a 2D side-scroller game: SEVEN separate body parts of one ice crystal dragon, laid out well apart from each other on a PLAIN WHITE background. Polished cartoon 2D game art, thick dark-navy outline all the way around every part, flat cel shading, light from upper left. THE DRAGON: a dragon made of frozen crystal, sharp ice shards along its spine, translucent wings like cracked ice, frost haze around it. Colours: deep ice blue #256f8a, light ice blue #7fd8f0, almost white #dff4ff, crystal white #ffffff. IMPORTANT: this creature is very pale, so every part needs a strong dark navy outline all the way around, so that the white areas are clearly enclosed. LAY OUT IN THIS ORDER, left to right, top row first: 1 torso only with no head no limbs no wings no tail, with the neck opening at its RIGHT end and the tail socket at its LEFT end, 2 head with neck facing RIGHT, 3 full tail thick at its RIGHT end and tapering to the tip at the LEFT, 4 near wing spread open with the shoulder end at the RIGHT and the membrane spreading up and to the LEFT, 5 far wing same shape slightly darker, 6 near hind leg with clawed foot and hip joint at top, 7 far hind leg slightly darker for depth. RULES: PLAIN WHITE background - not a checkerboard, not transparent, no gradient. Wide clear gaps between the parts, nothing touching or overlapping. Every part detached as if taken off the figure, with a clean rounded stump where it attaches. All parts in side view facing RIGHT. Thick dark outline completely around every part including around every white and pale area. No assembled dragon, no background scenery, no ground, no shadow under the parts, no text, labels, numbers, grid, guides, frames or watermark. Leave margin around everything - no part may touch the image edge.)
+```
+
+```bash
+node verktoy/del-opp.js ark/frostdragen.png art/monstre/frostdragen kropp hode hale vinge-fram vinge-bak bein-fram bein-bak
+```
+
+### 🗿 Kolossen — sjef, nivå 5
+
+```
+GetImageGeneration(size = square, description = Character parts sheet for a 2D side-scroller game: SIX separate body parts of one giant stone golem, laid out well apart from each other on a PLAIN WHITE background. Polished cartoon 2D game art, thick dark-navy outline all the way around every part, flat cel shading, light from upper left. THE CREATURE: a massive golem built from brown rock slabs, moss growing on the upper surfaces, glowing orange cracks between the stones. Tiny legs, enormous arms and fists, a blocky head with a heavy brow and glowing eyes. Colours: dark brown #5a3624, stone brown #a06a4a, light sandstone #d6b08a, moss green #4a8c39, glowing orange #ffb02e. LAY OUT IN THIS ORDER, left to right, top row first: 1 torso only with no head no limbs, 2 head facing RIGHT with the neck stump at the bottom, 3 near huge arm with massive fist and shoulder joint at top, 4 far huge arm slightly darker, 5 near short thick leg with wide stone foot and hip joint at top, 6 far short thick leg slightly darker for depth. RULES: PLAIN WHITE background - not a checkerboard, not transparent, no gradient. Wide clear gaps between the parts, nothing touching or overlapping. Every part detached as if taken off the figure, with a clean rounded stump where it attaches. All parts in side view facing RIGHT. Thick dark outline completely around every part including around any light areas. No assembled creature, no background scenery, no ground, no shadow under the parts, no text, labels, numbers, grid, guides, frames or watermark. Leave margin around everything - no part may touch the image edge.)
+```
+
+```bash
+node verktoy/del-opp.js ark/kolossen.png art/monstre/kolossen kropp hode arm-fram arm-bak bein-fram bein-bak
+```
+
+### 👑 Kongedragen — sjef, nivå 6, siste
+
+```
+GetImageGeneration(size = square, description = Character parts sheet for a 2D side-scroller game: SEVEN separate body parts of one golden dragon king, laid out well apart from each other on a PLAIN WHITE background. Polished cartoon 2D game art, thick dark-navy outline all the way around every part, flat cel shading, light from upper left. THE DRAGON KING: the final boss - a golden armoured dragon with a crown of horns, a heavy plated body and old battle scars, radiating power. It should look like the mightiest creature in the game. Colours: dark gold brown #8a520c, gold #f0a63c, light gold #ffd98a, deep red #8c1c14 as accent. LAY OUT IN THIS ORDER, left to right, top row first: 1 torso only with no head no limbs no tail, heavily armoured, with the neck opening at its RIGHT end and the tail socket at its LEFT end, 2 head with a crown of horns and neck facing RIGHT, 3 full tail thick at its RIGHT end and tapering to the tip at the LEFT, 4 near powerful clawed arm with shoulder joint at top, 5 far clawed arm slightly darker, 6 near hind leg with clawed foot and hip joint at top, 7 far hind leg slightly darker for depth. RULES: PLAIN WHITE background - not a checkerboard, not transparent, no gradient. Wide clear gaps between the parts, nothing touching or overlapping. Every part detached as if taken off the figure, with a clean rounded stump where it attaches. All parts in side view facing RIGHT. Thick dark outline completely around every part including around any light areas. No assembled dragon, no background scenery, no ground, no shadow under the parts, no text, labels, numbers, grid, guides, frames or watermark. Leave margin around everything - no part may touch the image edge.)
+```
+
+```bash
+node verktoy/del-opp.js ark/kongedragen.png art/monstre/kongedragen kropp hode hale arm-fram arm-bak bein-fram bein-bak
+```
+
+---
+
+Blir en del ufullstendig, som vingen på skyggedragen, kan du lage den av
+motparten i stedet for å be om et nytt bilde:
+
+```bash
+node verktoy/lag-bakside.js art/monstre/<navn>/vinge-fram.png art/monstre/<navn>/vinge-bak.png 0.55
+```
