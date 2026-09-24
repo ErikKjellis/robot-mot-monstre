@@ -250,6 +250,26 @@ const ISOEGLE = {
   ],
 };
 
+/** Kolossen - sjefen paa nivaa 5. Mosegrodd steinkjempe. */
+const KOLOSSEN = {
+  mappe: 'art/monstre/kolossen',
+  plassert: true,
+  deler: [
+    { navn: 'bein-bak', z: -25, beveg: 'gaa', fase: Math.PI, styrke: 0.24,
+      fest: [0.48, 0.10], paa: [-0.11, -0.40], h: 0.44 },
+    { navn: 'arm-bak', z: -15, beveg: 'sving', styrke: 0.26,
+      fest: [0.50, 0.12], paa: [-0.17, -0.72], h: 0.46 },
+    { navn: 'kropp', z: 0, beveg: 'duv',
+      fest: [0.5, 0.5], paa: [0, -0.58], h: 0.42 },
+    { navn: 'bein-fram', z: 10, beveg: 'gaa', styrke: 0.24,
+      fest: [0.48, 0.10], paa: [0.09, -0.38], h: 0.44 },
+    { navn: 'hode', z: 20, beveg: 'nikk',
+      fest: [0.50, 0.88], paa: [0.05, -0.78], h: 0.36 },
+    { navn: 'arm-fram', z: 30, beveg: 'sving', fase: 0, styrke: 0.26,
+      fest: [0.50, 0.12], paa: [0.19, -0.70], h: 0.48 },
+  ],
+};
+
 export const MONSTER_RIGS = {
   // smaa monstre
   smaadrage: SMAADRAGE,
@@ -263,7 +283,7 @@ export const MONSTER_RIGS = {
   godzaur:     M('godzaur', tobeint),
   roddrage:    M('roddrage', flygende, { fart: 6 }),
   hydra:       M('hydra', tobeint),
-  kolossen:    M('kolossen', klump),
+  kolossen: KOLOSSEN,
   frostdragen: M('frostdragen', flygende, { fart: 6 }),
   kongedragen: M('kongedragen', tobeint),
 };
