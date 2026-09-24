@@ -1,0 +1,9 @@
+Legg delark fra bilde-AI-en her (ett bilde med alle kroppsdelene).
+
+Del dem opp med:
+  node verktoy/del-opp.js ark/<navn>.png art/monstre/<navn> <delnavn i rekkefolge>
+
+F.eks:
+  node verktoy/del-opp.js ark/skyggedrage.png art/monstre/skyggedrage kropp hode hale vinge-fram vinge-bak bein-fram bein-bak
+
+Se art/AI-OPPSKRIFT.md for hvordan du ber AI-en om arket.

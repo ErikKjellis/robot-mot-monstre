@@ -5,3 +5,6 @@ Thumbs.db
 
 # originalbildene tas vare paa lokalt, men trengs ikke i repoet
 art/original/
+
+# delark fra bilde-AI-en - store filer, trengs ikke i repoet
+ark/*.png

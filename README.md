@@ -102,6 +102,7 @@ er skrevet for å limes rett inn til AI-en.
 |---|---|
 | **`verktoy/rigger.html`** | **Riggverkstedet** — dra hver kroppsdel på plass, sett leddene, roter og speilvend. Lagrer en `rigg.json` du legger i figurens mappe, så bruker spillet den med en gang. Du trenger ikke røre koden. |
 | `verktoy/figurtest.html` | Viser figuren stor og i bevegelse, og lister hvilke filer som ble funnet |
+| `node verktoy/del-opp.js` | Deler **ett ark** med alle kroppsdelene opp i hver sin PNG — se [art/AI-OPPSKRIFT.md](art/AI-OPPSKRIFT.md) |
 | `node verktoy/fiks-figurer.js art` | Samme opprydding for hånd (`serve.js` gjør det automatisk) |
 
 Delene trenger **ikke** ha samme størrelse eller samme plassering i bildet — tegn

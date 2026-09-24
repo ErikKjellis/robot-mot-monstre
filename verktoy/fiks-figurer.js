@@ -345,7 +345,11 @@ function ryddMappe(dir, opt = {}) {
   return ut;
 }
 
-module.exports = { ryddFil, ryddMappe, finnPngFiler };
+module.exports = {
+  ryddFil, ryddMappe, finnPngFiler,
+  // byggeklosser, brukt av verktoy/del-opp.js
+  decode, encode, stripBackground, despeckle, crop, shrink, MAX_SIZE,
+};
 
 // ------------------------------------------------------------------
 //  Kommandolinje
