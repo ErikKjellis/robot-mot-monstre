@@ -1,0 +1,126 @@
+{
+  "plassert": true,
+  "deler": [
+    {
+      "navn": "vinge-bak",
+      "z": -35,
+      "h": 0.4,
+      "fest": [
+        0.07,
+        0.74
+      ],
+      "paa": [
+        0.285,
+        -0.517
+      ],
+      "beveg": "vinge",
+      "speil": true,
+      "fase": 0.4,
+      "styrke": 0.42
+    },
+    {
+      "navn": "hale",
+      "z": -40,
+      "h": 0.28,
+      "fest": [
+        0.05,
+        0.5
+      ],
+      "paa": [
+        0.107,
+        -0.432
+      ],
+      "beveg": "hale",
+      "speil": true,
+      "styrke": 0.24
+    },
+    {
+      "navn": "bein-bak",
+      "z": -20,
+      "h": 0.29,
+      "fest": [
+        0.5,
+        0.08
+      ],
+      "paa": [
+        0.337,
+        -0.404
+      ],
+      "beveg": "sving",
+      "speil": true,
+      "styrke": 0.18
+    },
+    {
+      "navn": "kropp",
+      "z": 10,
+      "h": 0.38,
+      "fest": [
+        0.5,
+        0.5
+      ],
+      "paa": [
+        0.199,
+        -0.488
+      ],
+      "beveg": "duv",
+      "speil": true
+    },
+    {
+      "navn": "bein-fram",
+      "z": 0,
+      "h": 0.3,
+      "fest": [
+        0.5,
+        0.08
+      ],
+      "paa": [
+        0.175,
+        -0.406
+      ],
+      "beveg": "sving",
+      "speil": true,
+      "fase": 0.6,
+      "styrke": 0.18
+    },
+    {
+      "navn": "hode",
+      "z": 40,
+      "h": 0.41,
+      "fest": [
+        0.699,
+        0.827
+      ],
+      "paa": [
+        0.334,
+        -0.558
+      ],
+      "beveg": "nikk",
+      "speil": true,
+      "vinkel": 0.279,
+      "omkring": [
+        0.332,
+        -0.558
+      ]
+    },
+    {
+      "navn": "vinge-fram",
+      "z": 20,
+      "h": 0.44,
+      "fest": [
+        0.036,
+        0.624
+      ],
+      "paa": [
+        0.279,
+        -0.503
+      ],
+      "beveg": "vinge",
+      "speil": true,
+      "omkring": [
+        0.249,
+        -0.543
+      ],
+      "styrke": 0.5
+    }
+  ]
+}
