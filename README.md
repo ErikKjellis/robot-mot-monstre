@@ -113,6 +113,8 @@ legger nye PNG-er i `art/` mens den kjører. Bakgrunnen fjernes (også det grå
 rutemønsteret tegneprogrammer brenner inn i bildet), bildet beskjæres og
 krympes. Originalene tas vare på i `art/original/`.
 
+**Logoen** på startskjermen er `art/grafikk/logo.png` — bytt den ut, så vises den nye. Mangler den, står navnet der som tekst.
+
 **Husk mappa:** monstre skal ligge i `art/monstre/<navn>/`, ikke rett i `art/`.
 Roboten ligger i `art/robot/`.
 

@@ -177,6 +177,11 @@ h2{font-size:clamp(24px,5.6vh,46px);letter-spacing:2px;}
 .t1{font-size:clamp(34px,9vh,78px);color:#8fd6ff;text-shadow:0 4px 0 #1b4a6b;letter-spacing:2px;}
 .t2{font-size:clamp(16px,3.4vh,30px);color:#f7c33a;letter-spacing:6px;margin:2px 0;}
 .t3{font-size:clamp(34px,9vh,78px);color:#8fffa8;text-shadow:0 4px 0 #1b6b3a;letter-spacing:2px;}
+/* Logoen (art/grafikk/logo.png). Mangler den, vises teksten over i stedet. */
+.logo{display:block;height:clamp(120px,38vh,330px);width:auto;max-width:min(62vw,560px);object-fit:contain;
+      filter:drop-shadow(0 6px 0 rgba(0,0,0,.35));align-self:center;}
+#tittel:not(.uten-logo) .t1,#tittel:not(.uten-logo) .t2,#tittel:not(.uten-logo) .t3{display:none;}
+#tittel.uten-logo .logo{display:none;}
 
 /* --- Level intro --- */
 .level-card{animation:pop .3s ease;}
