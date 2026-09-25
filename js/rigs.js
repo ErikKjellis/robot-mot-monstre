@@ -307,7 +307,7 @@ export const MONSTER_RIGS = {
   // sjefer
   godzaur:     M('godzaur', tobeint),
   roddrage:    M('roddrage', flygende, { fart: 6 }),
-  hydra:       M('hydra', tobeint),
+  hydra:       M('hydra', firbeint),   // gaar paa fire - arm-delene er frambeina
   kolossen: KOLOSSEN,
   frostdragen: M('frostdragen', flygende, { fart: 6 }),
   kongedragen: M('kongedragen', tobeint),

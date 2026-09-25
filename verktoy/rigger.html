@@ -219,7 +219,10 @@ function serialise() {
     if (p.vinkel) o.vinkel = +(+p.vinkel).toFixed(3);
     if (p.omkring) o.omkring = p.omkring.map((v) => +(+v).toFixed(3));
     if (p.krever) o.krever = p.krever;
-    if (p.fase) o.fase = +(+p.fase).toFixed(3);
+    // fase 0 er et ekte valg (armen i motfase til den bakre), og fart styrer
+    // vingetakten - begge maa lagres, ellers faller spillet tilbake paa standard.
+    if (p.fase != null) o.fase = +(+p.fase).toFixed(3);
+    if (p.fart != null) o.fart = p.fart;
     if (p.styrke != null) o.styrke = p.styrke;
     return o;
   });

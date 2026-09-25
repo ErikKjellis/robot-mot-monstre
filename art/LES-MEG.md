@@ -12,6 +12,8 @@ Kjør `node serve.js`, og åpne:
 |---|---|
 | **`verktoy/rigger.html`** | **Riggverkstedet.** Dra hver kroppsdel på plass, sett leddene, roter, speilvend. Lagrer `rigg.json`. Det er her du bygger figuren. |
 | `verktoy/figurtest.html` | Viser figuren stor og i bevegelse, og lister hvilke filer som ble funnet |
+| `verktoy/lag-startrigg.js` | Lager en `rigg.json` å starte med: finner leddene i bildene selv og setter figuren sammen. `node verktoy/lag-startrigg.js art/monstre/<navn> <kroppstype>` (tobeint, flygende, firbeint eller klump). Finjuster etterpå i riggverkstedet. |
+| `verktoy/sjekk-del.js` | Sjekker bilder av kroppsdeler før du bruker dem: hvit bakgrunn, én bit, ingenting kuttet av kanten, bleke kanter uten strek, og om delene har samme farger. `node verktoy/sjekk-del.js <mappe>` |
 
 ### Bildene ryddes av seg selv
 
