@@ -45,7 +45,11 @@ export const ROBOT_RIG = {
     'bein-fram': 'bein',
     'rygg': 'jet',
     'vapen': 'kanon',
+    'hammer': 'hammer',
   },
+  // Deler som har et eget bilde i en bestemt tilstand: naar roboten flyr, brukes
+  // rygg-jet3-flamme.png (jetpakken med flammer) i stedet for rygg-jet3.png.
+  tilstander: { rygg: ['flamme'] },
   deler: [
     // jetpack paa ryggen - godt ut til venstre saa den stikker ut bak kroppen
     { navn: 'rygg', z: -40, beveg: 'ingen', krever: 'jet', speil: true,

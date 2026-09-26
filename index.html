@@ -30,7 +30,7 @@
       <div class="hud-grow">
         <div class="progress"><div id="progressFill"></div><span class="flag">&#128681;</span></div>
       </div>
-      <button id="btnPause" class="icon-btn" aria-label="Pause">&#9208;</button>
+      <button id="btnPause" class="icon-btn bildeknapp" aria-label="Pause">&#9208;</button>
     </div>
     <div id="bossWrap" class="bosswrap hide">
       <span class="boss-face" id="bossFace">&#128127;</span>
@@ -43,6 +43,9 @@
     <div id="stickZone"></div>
     <div id="stick"><div id="stickKnob"></div></div>
     <div class="pad pad-right">
+      <!-- hammer og jetpakke vises foerst naar de er kjoept i butikken -->
+      <button id="btnHammer" class="tbtn hammer hide" data-act="hammer" aria-label="Hammer">&#128296;<i class="klar"></i></button>
+      <button id="btnJet" class="tbtn jet hide" data-act="jet" aria-label="Jetpakke">&#128640;<i class="tank"><b></b></i></button>
       <button class="tbtn shoot" data-act="shoot" aria-label="Skyt">&#128165;</button>
       <button class="tbtn jump" data-act="jump" aria-label="Hopp">&#11014;</button>
     </div>
@@ -59,11 +62,11 @@
               onerror="document.getElementById('tittel').classList.add('uten-logo')"><span
               class="t1">ROBOT</span><span class="t2">mot</span><span class="t3">MONSTRE</span></h1>
           <div class="btn-col">
-            <button id="btnPlay" class="big-btn green">&#9654; SPILL</button>
+            <button id="btnPlay" class="big-btn green bildeknapp" aria-label="Spill">&#9654; SPILL</button>
             <div class="btn-row">
-              <button id="btnScores" class="big-btn small yellow">&#127942;</button>
-              <button id="btnSound" class="big-btn small blue">&#128266;</button>
-              <button id="btnFull" class="big-btn small blue">&#9974;</button>
+              <button id="btnScores" class="big-btn small yellow bildeknapp" aria-label="Highscore">&#127942;</button>
+              <button id="btnSound" class="big-btn small blue bildeknapp" aria-label="Lyd">&#128266;</button>
+              <button id="btnFull" class="big-btn small blue bildeknapp" aria-label="Fullskjerm">&#9974;</button>
             </div>
           </div>
         </div>
@@ -72,7 +75,7 @@
 
     <section id="scrIntro" class="screen hide center">
       <div class="level-card">
-        <div class="lvl-label">NIV&Aring;</div>
+        <div class="lvl-label" data-tekst="NIVÅ">NIV&Aring;</div>
         <div id="introNum" class="lvl-num">1</div>
         <div id="introMon" class="lvl-monsters"></div>
       </div>
@@ -81,7 +84,7 @@
     <section id="scrShop" class="screen hide">
       <div class="shop">
         <div class="shop-head">
-          <h2>BUTIKK</h2>
+          <h2 data-tekst="BUTIKK">BUTIKK</h2>
           <div class="hud-box coins big"><span class="ico">&#129689;</span><span id="shopCoins">0</span></div>
         </div>
         <div class="shop-body">
@@ -91,49 +94,49 @@
           </div>
           <div id="shopGrid" class="shop-grid"></div>
         </div>
-        <button id="btnShopGo" class="big-btn green wide">&#9654; SPILL</button>
+        <button id="btnShopGo" class="big-btn green wide bildeknapp" aria-label="Spill">&#9654; SPILL</button>
       </div>
     </section>
 
     <section id="scrWin" class="screen hide center">
       <div class="panel">
-        <div class="big-emoji">&#11088;</div>
+        <div class="big-emoji bildeikon stjerne">&#11088;</div>
         <h2 id="winTitle">BRA!</h2>
         <div class="reward"><span class="ico">&#129689;</span><span id="winCoins">0</span></div>
-        <button id="btnWinGo" class="big-btn green wide">&#128717; BUTIKK</button>
+        <button id="btnWinGo" class="big-btn green wide"><span class="ico">&#128717;</span> <span data-tekst="BUTIKK">BUTIKK</span></button>
       </div>
     </section>
 
     <section id="scrOver" class="screen hide center">
       <div class="panel">
-        <div class="big-emoji" id="overEmoji">&#128128;</div>
+        <div class="big-emoji bildeikon" id="overEmoji">&#128128;</div>
         <h2 id="overTitle">AU!</h2>
         <div class="worth big"><span class="ico">&#11088;</span><span id="overWorth">0</span></div>
         <div class="name-row">
           <input id="nameInput" maxlength="7" autocomplete="off" spellcheck="false" value="ROBO">
         </div>
         <div class="btn-row">
-          <button id="btnAgain" class="big-btn green">&#128260; IGJEN</button>
-          <button id="btnHome" class="big-btn yellow">&#127942;</button>
+          <button id="btnAgain" class="big-btn green bildeknapp" aria-label="Igjen">&#128260; IGJEN</button>
+          <button id="btnHome" class="big-btn yellow bildeknapp" aria-label="Highscore">&#127942;</button>
         </div>
       </div>
     </section>
 
     <section id="scrScores" class="screen hide center">
       <div class="panel wide-panel">
-        <h2>&#127942; BESTE</h2>
+        <h2>&#127942; <span data-tekst="BESTE">BESTE</span></h2>
         <ol id="scoreList" class="score-list"></ol>
-        <button id="btnScoresBack" class="big-btn blue wide">&#127968;</button>
+        <button id="btnScoresBack" class="big-btn blue wide bildeknapp" aria-label="Hjem">&#127968;</button>
       </div>
     </section>
 
     <section id="scrPause" class="screen hide center">
       <div class="panel">
-        <h2>PAUSE</h2>
+        <h2 data-tekst="PAUSE">PAUSE</h2>
         <div class="btn-row">
-          <button id="btnResume" class="big-btn green">&#9654;</button>
-          <button id="btnSound2" class="big-btn blue">&#128266;</button>
-          <button id="btnQuit" class="big-btn red">&#127968;</button>
+          <button id="btnResume" class="big-btn green bildeknapp" aria-label="Fortsett">&#9654;</button>
+          <button id="btnSound2" class="big-btn blue bildeknapp" aria-label="Lyd">&#128266;</button>
+          <button id="btnQuit" class="big-btn red bildeknapp" aria-label="Hjem">&#127968;</button>
         </div>
       </div>
     </section>

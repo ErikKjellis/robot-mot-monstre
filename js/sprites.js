@@ -18,6 +18,7 @@ const cache = new Map();
 // Verktoeyet i verktoy/ ligger en mappe ned, og maa lete etter art/ ett hakk opp.
 let BASE = '';
 export function setBase(b) { BASE = b; }
+export function basis() { return BASE; }
 
 // Nettleseren husker gjerne at en fil IKKE fantes. Figurtesteren slaar derfor
 // paa "alltid hent paa nytt", saa en PNG du nettopp lagde dukker opp med en gang.
@@ -254,7 +255,7 @@ export function placedLayout(rig, s) {
   for (const p of rig.deler) {
     if (p.av) continue;
     if (p.krever && !(s.variants && (s.variants[p.krever] | 0) > 0)) continue;
-    const path = partPath(rig, base, p.navn, s.variants);
+    const path = partPath(rig, base, p.navn, s.variants, s.tilstand && s.tilstand[p.navn]);
     const img = p.bilde || tex(path);
     if (!img) { if (pending(path)) waiting = true; continue; }
     const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
@@ -290,11 +291,115 @@ export function paintPart(c, L) {
   c.restore();
 }
 
+// ---------------------------------------------------------------
+//  FOETTENE PAA BAKKEN
+//  Den laveste synlige pikselen i figuren, staaende i ro, settes akkurat
+//  paa bakken. Da flyter ingen figur - selv om bildene har litt luft under
+//  foettene, eller riggen er satt litt for hoeyt eller lavt.
+//  Vil du styre det selv: "fotJustering": false i rigg.json.
+// ---------------------------------------------------------------
+const alfaBokser = new WeakMap();
+
+/** Rektangelet rundt de synlige pikslene i et bilde (0-1). */
+function alfaBoks(img) {
+  let b = alfaBokser.get(img);
+  if (b) return b;
+  const S = 128;
+  const k = Math.min(1, S / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.max(1, Math.round(img.naturalWidth * k));
+  const h = Math.max(1, Math.round(img.naturalHeight * k));
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.drawImage(img, 0, 0, w, h);
+  let d = null;
+  try { d = g.getImageData(0, 0, w, h).data; } catch (e) { /* bilde fra en annen side - bruk hele */ }
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  if (d) {
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (d[(y * w + x) * 4 + 3] <= 60) continue;
+        if (x < x0) x0 = x; if (x > x1) x1 = x;
+        if (y < y0) y0 = y; if (y > y1) y1 = y;
+      }
+    }
+  }
+  b = x1 >= 0 ? { x0: x0 / w, y0: y0 / h, x1: (x1 + 1) / w, y1: (y1 + 1) / h } : { x0: 0, y0: 0, x1: 1, y1: 1 };
+  alfaBokser.set(img, b);
+  return b;
+}
+
+// Regnes ut EN gang per rigg (og per sett med oppgraderinger for roboten).
+// Noekkelen er riggens deleliste - den byttes naar en egen rigg.json lastes inn.
+const fotCache = new WeakMap();
+const fotSkyv = new Map();   // rigg-mappe -> siste flytting, brukt av dysePunkt
+
+/**
+ * Hvor langt under (+) eller over (-) bakken figurens laveste synlige punkt
+ * er naar den staar i ro, i andel av figurhoeyden. 0 mens bildene lastes.
+ */
+export function fotAvvik(rig, s) {
+  if (rig.fotJustering === false || !rig.deler) return 0;
+  let perRigg = fotCache.get(rig.deler);
+  if (!perRigg) { perRigg = new Map(); fotCache.set(rig.deler, perRigg); }
+  const key = s.variants ? Object.values(s.variants).join(',') : '';
+  if (perRigg.has(key)) return perRigg.get(key);
+  const lavest = laveste(rig, s);
+  if (lavest === null) return 0;                  // proev igjen naar bildene er lastet
+  perRigg.set(key, lavest);
+  return lavest;
+}
+
+/**
+ * Laveste synlige punkt paa figuren naar den staar i ro, i andel av hoeyden
+ * (y nedover). null mens bildene lastes. Uten mellomlagring - riggverkstedet
+ * bruker den mens du flytter delene.
+ */
+export function laveste(rig, s) {
+  const hvile = placedLayout(rig, Object.assign({}, s, {
+    h: 1, walk: 0, move: 0, t: 0, aim: 0, recoil: 0, smash: 0, tilstand: null,
+  }));
+  if (hvile.waiting || !hvile.length) return null;
+  let lavest = -Infinity;
+  for (const L of hvile) {
+    const b = alfaBoks(L.img);
+    const c = Math.cos(L.rot), sn = Math.sin(L.rot);
+    for (const [u, v] of [[b.x0, b.y0], [b.x1, b.y0], [b.x0, b.y1], [b.x1, b.y1]]) {
+      // samme vei som paintPart: speil, flytt til leddet, roter om dreiepunktet
+      let x = (u - L.jx) * L.pw;
+      const y = (v - L.jy) * L.ph + L.ay;
+      if (L.p.speil) x = -x;
+      x += L.ax;
+      lavest = Math.max(lavest, L.ry + (x - L.rx) * sn + (y - L.ry) * c + L.dy);
+    }
+  }
+  return lavest;
+}
+
+/**
+ * Hvor flammen fra jetpakken kommer ut, i piksler fra midt mellom foettene
+ * (figuren vendt mot hoeyre). Foelger ryggdelen i riggen, ogsaa din egen rigg.json.
+ */
+export function dysePunkt(rig, H) {
+  const egen = customRig(rig);
+  const r = egen ? Object.assign({}, rig, egen) : rig;
+  const p = (r.deler || []).find((d) => d.navn === 'rygg');
+  const skyv = (fotSkyv.get(rig.mappe) || 0) * H;
+  if (!p || !p.paa) return { x: -0.28 * H, y: -0.45 * H + skyv };
+  const fest = p.fest || [0.5, 0.5];
+  return { x: p.paa[0] * H, y: (p.paa[1] + (1 - fest[1]) * (p.h || 0.3) * 0.85) * H + skyv };
+}
+
 function drawPlaced(ctx, rig, s) {
   const H = s.h;
   const layout = placedLayout(rig, s);
   if (!layout.length) return false;
-  const paint = (c) => { for (const L of layout) paintPart(c, L); };
+  const skyv = -fotAvvik(rig, s);             // flytt figuren saa foettene treffer bakken
+  fotSkyv.set(rig.mappe, skyv);
+  const paint = (c) => {
+    if (skyv) c.translate(0, skyv * H);
+    for (const L of layout) paintPart(c, L);
+  };
 
   if (s.flash) {
     const bw = H * 1.9, bh = H * 1.7;
@@ -376,7 +481,19 @@ const ALIAS = {
   'vinge-bak': ['vinge_bak'],
 };
 
-function partPath(rig, base, navn, variants) {
+function partPath(rig, base, navn, variants, tilstand) {
+  const vanlig = vanligSti(rig, base, navn, variants);
+  // Eget bilde for tilstanden (jetpakken med flammer) - bare for akkurat det bildet
+  // som vises (rygg-jet3.png -> rygg-jet3-flamme.png), og bare naar det er lastet,
+  // ellers blinker delen bort mens bildet hentes.
+  if (tilstand) {
+    const t = vanlig.replace(/\.png$/, '-' + tilstand + '.png');
+    if (tex(t)) return t;
+  }
+  return vanlig;
+}
+
+function vanligSti(rig, base, navn, variants) {
   const v = rig.variant && rig.variant[navn];
   const names = [navn].concat(ALIAS[navn] || []);
   if (v && variants) {
@@ -401,11 +518,24 @@ function partPath(rig, base, navn, variants) {
 export function rigPaths(rig, maxVariant = 5) {
   const out = [rig.mappe + '.png'];
   for (const p of rig.deler) {
+    const tilstander = (rig.tilstander && rig.tilstander[p.navn]) || [];
     for (const n of [p.navn].concat(ALIAS[p.navn] || [])) {
       out.push(rig.mappe + '/' + n + '.png');
+      for (const t of tilstander) out.push(rig.mappe + '/' + n + '-' + t + '.png');
       const v = rig.variant && rig.variant[p.navn];
-      if (v) for (let i = 1; i <= maxVariant; i++) out.push(rig.mappe + '/' + n + '-' + v + i + '.png');
+      if (v) {
+        for (let i = 1; i <= maxVariant; i++) {
+          out.push(rig.mappe + '/' + n + '-' + v + i + '.png');
+          for (const t of tilstander) out.push(rig.mappe + '/' + n + '-' + v + i + '-' + t + '.png');
+        }
+      }
     }
   }
   return out;
+}
+
+/** Sant hvis delen har et eget, ferdig lastet bilde for tilstanden (f.eks. 'flamme'). */
+export function harTilstand(rig, navn, variants, tilstand) {
+  const p = partPath(rig, rig.mappe, navn, variants, tilstand);
+  return p.endsWith('-' + tilstand + '.png') && !!tex(p);
 }

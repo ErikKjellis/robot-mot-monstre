@@ -69,6 +69,7 @@ const TYPES = {
   '.png': 'image/png',
   '.webmanifest': 'application/manifest+json',
   '.json': 'application/json',
+  '.md': 'text/plain; charset=utf-8',
 };
 
 http.createServer((req, res) => {

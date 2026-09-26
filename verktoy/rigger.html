@@ -82,6 +82,7 @@
       <label><span>Sikte</span><input id="aim" type="range" min="-90" max="90" value="0"><span class="val" id="aimV">0°</span></label>
       <label><span>Slag</span><input id="smash" type="range" min="0" max="100" value="0"><span class="val" id="smashV">0</span></label>
       <label><span>Vis som</span><select id="vari"></select></label>
+      <label title="Spillet setter figurens laveste punkt akkurat på bakken. Slå av hvis du vil styre høyden selv."><span>Føtter på bakken</span><input id="fot" type="checkbox" checked></label>
     </div>
 
     <div class="card">
@@ -126,7 +127,7 @@
 </div>
 
 <script type="module">
-import { setBase, setBust, tex, placedLayout, paintPart } from '../js/sprites.js';
+import { setBase, setBust, tex, placedLayout, paintPart, laveste } from '../js/sprites.js';
 import { ROBOT_RIG, MONSTER_RIGS } from '../js/rigs.js';
 import { UPGRADES } from '../js/content.js';
 
@@ -196,6 +197,7 @@ async function loadFig(key) {
   rig = {
     mappe: base.mappe,
     plassert: true,
+    fotJustering: !(saved && saved.fotJustering === false),
     variant: base.variant || {},
     deler: JSON.parse(JSON.stringify((saved && saved.deler) || base.deler || [])),
   };
@@ -207,6 +209,7 @@ async function loadFig(key) {
     if (p.z == null) p.z = i * 10;
   });
   blobs.clear();
+  $('fot').checked = rig.fotJustering !== false;
   rebuildList();
 }
 
@@ -226,7 +229,9 @@ function serialise() {
     if (p.styrke != null) o.styrke = p.styrke;
     return o;
   });
-  return JSON.stringify({ plassert: true, deler }, null, 2);
+  // fotJustering skrives bare naar den er slaatt av - paa er standard i spillet
+  const ut = rig.fotJustering === false ? { plassert: true, fotJustering: false, deler } : { plassert: true, deler };
+  return JSON.stringify(ut, null, 2);
 }
 
 $('bSave').onclick = () => {
@@ -322,6 +327,7 @@ $('aim').oninput = (e) => { ui.aim = +e.target.value * Math.PI / 180; $('aimV').
 $('smash').oninput = (e) => { ui.smash = +e.target.value / 100; $('smashV').textContent = e.target.value; };
 $('vari').onchange = (e) => { ui.vari = e.target.value; };
 $('fig').onchange = (e) => loadFig(e.target.value);
+$('fot').onchange = (e) => { rig.fotJustering = e.target.checked; };
 
 // ---------------------------------------------------------------
 //  Legge til PNG
@@ -439,6 +445,21 @@ function draw() {
   ctx.translate(view.ox, view.oy);
   for (const item of L) paintPart(ctx, item);
   ctx.restore();
+
+  // "Foetter paa bakken": spillet flytter figuren saa det laveste punktet staar paa
+  // bakken. Den stiplede streken viser hvor det punktet er naa - ligger den under
+  // eller over den groenne bakkestreken, flyttes figuren dit i spillet.
+  if (rig.fotJustering !== false) {
+    const lav = laveste(rig, Object.assign({}, state(), { h: 1 }));
+    if (lav !== null && Math.abs(lav) > 0.002) {
+      const y = view.oy + lav * view.H;
+      ctx.strokeStyle = 'rgba(255,190,90,.8)'; ctx.setLineDash([8, 6]); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(255,190,90,.9)'; ctx.font = '12px sans-serif';
+      ctx.fillText('laveste punkt: spillet flytter figuren saa dette havner paa bakken', 8, y - 5);
+    }
+  }
 
   // handtak
   ctx.save();

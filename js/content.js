@@ -40,11 +40,11 @@ export function stats(up) {
     laserDmg: up.laser * 3.5,
     laserEvery: 3.4 - up.laser * 0.36,   // 3.0s -> 1.6s
 
-    // HAMMER - smeller automatisk paa alt som kommer for naerme
+    // HAMMER - slaar naar du trykker paa hammerknappen
     hammer: up.hammer,
     hammerDmg: up.hammer * 4.5,
     hammerRange: 26 + up.hammer * 13,
-    hammerEvery: 1.5 - up.hammer * 0.13,
+    hammerEvery: 1.2 - up.hammer * 0.12,  // pause mellom slagene: 1.08s -> 0.6s
 
     // BEIN - fart og hopp
     speed: 240 + up.bein * 32,
@@ -57,9 +57,14 @@ export function stats(up) {
     hasShield: up.panser >= 2,
     shieldCool: 9 - up.panser,
 
-    // JET - ekstra hopp i lufta
-    jumps: 1 + (up.jet > 0 ? 1 : 0) + (up.jet >= 4 ? 1 : 0),
-    jetPower: 0.62 + up.jet * 0.05,
+    // JET - hold jetknappen for aa fly. Tanken tappes mens du flyr og fylles
+    // igjen naar du slipper. Nivaa 1 tappes fort og fylles sakte; for hvert
+    // nivaa varer tanken lenger og fylles raskere.
+    jet: up.jet,
+    jetTid: 0.7 + Math.max(0, up.jet - 1) * 0.45,        // sekunder paa full tank: 0.7 -> 2.5
+    jetLading: 0.12 + Math.max(0, up.jet - 1) * 0.1,     // tank per sekund: 8 s -> ca. 2 s til full
+    jetFart: 330 + up.jet * 35,                          // hvor fort den stiger
+    jetKraft: 1400 + up.jet * 120,                       // hvor raskt den tar seg opp
 
     // vokser med ALT du kjoeper
     magnet: 90 + total * 9,
@@ -145,6 +150,8 @@ export const THEMES = {
   lava:  { sky: ['#3a0f12', '#a8391b'], far: '#61201a', mid: '#3d1210', ground: '#5f2d20', ground2: '#3c1b15', accent: '#ff9a3d', particle: '#ffb057', form: 'fjell' },
   rom:   { sky: ['#05060f', '#1d2350'], far: '#1b2050', mid: '#10142f', ground: '#2f3566', ground2: '#1e2348', accent: '#7ae6ff', particle: '#ffffff', form: 'fjell', stars: true },
 };
+// Temaet vet sitt eget navn - egne bakgrunnsbilder ligger i art/bane/<navn>/
+for (const [k, t] of Object.entries(THEMES)) t.key = k;
 
 // ============================================================
 //  NIVAAENE

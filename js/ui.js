@@ -5,6 +5,7 @@ import { UPGRADES, MAX_LEVEL, LEVELS } from './content.js';
 import { renderBotPreview } from './art.js';
 import { ROBOT_RIG } from './rigs.js';
 import { drawRig } from './sprites.js';
+import { settTekst } from './skrift.js';
 
 export const el = (id) => document.getElementById(id);
 
@@ -24,6 +25,7 @@ export function showLayer(id, on) {
 let lastHp = -1;
 let lastCoins = -1;
 let lastBoosts = '';
+let lastKnapper = null, lastTank = '', lastKlar = '';
 
 export function updateHud(h) {
   const hp = Math.max(0, Math.round(h.hp));
@@ -34,10 +36,10 @@ export function updateHud(h) {
     fill.style.width = (frac * 100).toFixed(1) + '%';
     fill.classList.toggle('mid', frac <= 0.55 && frac > 0.28);
     fill.classList.toggle('low', frac <= 0.28);
-    el('hpNum').textContent = hp;
+    settTekst(el('hpNum'), hp);
   }
   el('shieldIco').classList.toggle('hide', !h.shield);
-  if (h.coins !== lastCoins) { el('coinCount').textContent = h.coins; lastCoins = h.coins; }
+  if (h.coins !== lastCoins) { settTekst(el('coinCount'), h.coins); lastCoins = h.coins; }
 
   // aktive kraftpakker
   const sig = h.boosts.map((b) => b.key + Math.ceil(b.left * 4)).join(',');
@@ -53,6 +55,30 @@ export function updateHud(h) {
       box.appendChild(d);
     });
   }
+  // jetpakke og hammer: knappene vises naar de er kjoept, med tank og lading
+  const knapper = (h.jet ? 'j' : '') + (h.hammer ? 'h' : '');
+  if (knapper !== lastKnapper) {
+    lastKnapper = knapper;
+    el('btnJet').classList.toggle('hide', !h.jet);
+    el('btnHammer').classList.toggle('hide', !h.hammer);
+  }
+  const tank = h.fuel.toFixed(2) + (h.jetting ? 'f' : '') + (h.jetTom ? 't' : '');
+  if (h.jet && tank !== lastTank) {
+    lastTank = tank;
+    const b = el('btnJet');
+    b.style.setProperty('--tank', h.fuel.toFixed(2));
+    b.classList.toggle('lav', h.fuel < 0.25);
+    b.classList.toggle('flyr', h.jetting);
+    b.classList.toggle('tom', h.jetTom);     // tom tank: knappen er matt til den har fylt seg litt
+  }
+  const klar = h.hammerKlar.toFixed(2);
+  if (h.hammer && klar !== lastKlar) {
+    lastKlar = klar;
+    const b = el('btnHammer');
+    b.style.setProperty('--klar', klar);
+    b.classList.toggle('venter', klar !== '1.00');
+  }
+
   el('progressFill').style.width = (h.progress * 100).toFixed(1) + '%';
   const bw = el('bossWrap');
   if (h.boss == null) {
@@ -64,7 +90,10 @@ export function updateHud(h) {
   }
 }
 
-export function resetHudCache() { lastHp = -1; lastCoins = -1; lastBoosts = ''; }
+export function resetHudCache() {
+  lastHp = -1; lastCoins = -1; lastBoosts = '';
+  lastKnapper = null; lastTank = ''; lastKlar = '';
+}
 
 // ---------------------------------------------------------------
 //  BUTIKKEN
@@ -84,7 +113,7 @@ export function buildShop(game, onBuy) {
       card.className = 'card';
       card.innerHTML =
         '<span class="c-ico">' + u.ico + '</span>' +
-        '<span class="c-name">' + u.name + '</span>' +
+        '<span class="c-name" data-tekst="' + u.name + '">' + u.name + '</span>' +
         '<span class="pips">' + '<span class="pip"></span>'.repeat(MAX_LEVEL) + '</span>' +
         '<span class="price"><span>\u{1F529}</span><span class="pv">0</span></span>';
       card.addEventListener('click', () => {
@@ -105,6 +134,7 @@ export function buildShop(game, onBuy) {
         }
       });
       grid.appendChild(card);
+      settTekst(card.querySelector('.c-name'), u.name);
       return card;
     });
   }
@@ -113,8 +143,8 @@ export function buildShop(game, onBuy) {
 
 export function refreshShop(game) {
   if (!shopCards) return;
-  el('shopCoins').textContent = game.run.coins;
-  el('shopWorth').textContent = game.worth;
+  settTekst(el('shopCoins'), game.run.coins);
+  settTekst(el('shopWorth'), game.worth);
   UPGRADES.forEach((u, i) => {
     const card = shopCards[i];
     const lvl = game.run.up[u.key];
@@ -125,8 +155,8 @@ export function refreshShop(game) {
     card.querySelectorAll('.pip').forEach((p, k) => p.classList.toggle('on', k < lvl));
     const pv = card.querySelector('.pv');
     const coinIco = card.querySelector('.price span');
-    if (maxed) { pv.textContent = 'MAX'; coinIco.textContent = '⭐'; }
-    else { pv.textContent = price; coinIco.textContent = '\u{1FA99}'; }
+    if (maxed) { settTekst(pv, 'MAX'); coinIco.textContent = '⭐'; }
+    else { settTekst(pv, price); coinIco.textContent = '\u{1FA99}'; }
   });
 }
 
@@ -186,9 +216,12 @@ export function renderScores(highlight) {
     const li = document.createElement('li');
     if (i === highlight) li.className = 'me';
     li.innerHTML =
-      '<span class="nm">' + escapeHtml(s.name) + '</span>' +
-      '<span class="lv">' + '\u{1F3F3}️' + (s.level || 1) + '</span>' +
-      '<span>⭐ ' + s.value + '</span>';
+      '<span class="nm"></span>' +
+      '<span class="lv">' + '\u{1F3F3}️' + '<span class="lvn"></span></span>' +
+      '<span>⭐ <span class="vv"></span></span>';
+    settTekst(li.querySelector('.nm'), s.name);
+    settTekst(li.querySelector('.lvn'), s.level || 1);
+    settTekst(li.querySelector('.vv'), s.value);
     ol.appendChild(li);
   });
 }
@@ -203,11 +236,15 @@ function escapeHtml(s) {
 // ---------------------------------------------------------------
 export function setSoundIcons() {
   const ico = sound.on ? '\u{1F50A}' : '\u{1F507}';
-  el('btnSound').textContent = ico;
-  el('btnSound2').textContent = ico;
+  for (const id of ['btnSound', 'btnSound2']) {
+    const b = el(id);
+    b.textContent = ico;
+    b.classList.toggle('av', !sound.on);
+    b.setAttribute('aria-label', sound.on ? 'Lyd på' : 'Lyd av');
+  }
 }
 
 export function showIntro(levelIndex) {
-  el('introNum').textContent = levelIndex + 1;
+  settTekst(el('introNum'), levelIndex + 1);
   el('introMon').textContent = (LEVELS[levelIndex].preview || []).join(' ');
 }

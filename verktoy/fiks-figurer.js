@@ -10,6 +10,9 @@
 //   3. Krymper til maks 512 piksler - figurene vises uansett bare
 //      50-250 piksler store i spillet, og da blir fila mye mindre.
 //
+// Bakgrunnsbilder i art/bane/ krympes aldri, og himmel.png og bakke.png
+// roeres ikke i det hele tatt.
+//
 // Originalene kopieres til art/original/ foerst, saa ingenting gaar tapt.
 // Kjoer den paa nytt saa mange ganger du vil - den hopper over filer som
 // allerede er ryddet.
@@ -109,10 +112,29 @@ function chunk(type, data) {
 }
 function encode(im) {
   const stride = im.w * 4;
+  // Helt gjennomsiktige piksler faar fargen 0: det ser helt likt ut, men pakker mye bedre.
+  const px = Buffer.from(im.px);
+  for (let i = 0; i < px.length; i += 4) if (px[i + 3] === 0) { px[i] = 0; px[i + 1] = 0; px[i + 2] = 0; }
+  // For hver rad velges det av PNG-filtrene (ingen, venstre, opp, snitt, Paeth) som
+  // gir de minste tallene - da pakker zlib bildet til omtrent halve stoerrelsen.
   const raw = Buffer.alloc((stride + 1) * im.h);
+  const kand = [0, 1, 2, 3, 4].map(() => Buffer.alloc(stride));
   for (let y = 0; y < im.h; y++) {
-    raw[y * (stride + 1)] = 0;
-    im.px.copy(raw, y * (stride + 1) + 1, y * stride, y * stride + stride);
+    const r = y * stride, o = r - stride;
+    for (let x = 0; x < stride; x++) {
+      const v = px[r + x], a = x >= 4 ? px[r + x - 4] : 0, b = y ? px[o + x] : 0, c = y && x >= 4 ? px[o + x - 4] : 0;
+      const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+      const paeth = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      kand[0][x] = v; kand[1][x] = v - a; kand[2][x] = v - b; kand[3][x] = v - ((a + b) >> 1); kand[4][x] = v - paeth;
+    }
+    let best = 0, bestSum = Infinity;
+    for (let f = 0; f < 5; f++) {
+      let s = 0;
+      for (let x = 0; x < stride; x++) { const v = kand[f][x]; s += v < 128 ? v : 256 - v; }
+      if (s < bestSum) { bestSum = s; best = f; }
+    }
+    raw[y * (stride + 1)] = best;
+    kand[best].copy(raw, y * (stride + 1) + 1);
   }
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(im.w, 0); ihdr.writeUInt32BE(im.h, 4);
@@ -201,7 +223,7 @@ function stripBackground(im) {
  * igjen etter bakgrunnsfjerning ville ellers gjoere at delen ikke kan
  * beskjaeres ordentlig - og da blir figuren bitte liten i spillet.
  */
-function despeckle(im) {
+function despeckle(im, andel = 0.04, bareTell = false) {
   const { w, h, px } = im;
   const lab = new Int32Array(w * h).fill(-1);
   const sizes = [];
@@ -226,9 +248,9 @@ function despeckle(im) {
   }
   if (!sizes.length) return { fjernet: 0, biter: 0 };
   const biggest = Math.max(...sizes);
-  const min = biggest * 0.04;
+  const min = biggest * andel;
   let killed = 0;
-  for (let k = 0; k < w * h; k++) {
+  for (let k = 0; !bareTell && k < w * h; k++) {
     const id = lab[k];
     if (id >= 0 && sizes[id] < min) { px[k * 4 + 3] = 0; killed++; }
     else if (id < 0 && px[k * 4 + 3] > 0 && px[k * 4 + 3] <= 40) px[k * 4 + 3] = 0;
@@ -296,6 +318,12 @@ function shrink(im, max) {
   return { w: nw, h: nh, px: out };
 }
 
+function andelGjennomsiktig(im) {
+  let n = 0;
+  for (let i = 3; i < im.px.length; i += 4) if (im.px[i] < 8) n++;
+  return n / (im.w * im.h);
+}
+
 // ------------------------------------------------------------------
 //  Rydd en enkelt fil. Returnerer null hvis den alt var i orden.
 // ------------------------------------------------------------------
@@ -309,16 +337,52 @@ function ryddFil(f, force) {
   if (path.basename(artRot) !== 'art') artRot = path.dirname(path.resolve(f));
   const rel = path.relative(artRot, path.resolve(f)).replace(/\\/g, '/');
   const backup = path.join(artRot, 'original', rel);
+  // Bakgrunnsbildene i art/bane/ er ikke figurer. Himmel og bakke dekker
+  // hele flaten og roeres ikke. De andre lagene faar fjernet den hvite
+  // bakgrunnen, men krympes ikke - de skal fylle skjermen - og mister ikke
+  // smaa biter (en skog er mange loese traer).
+  // Fonter (bokstavark og atlas) i art/font/ roeres ikke - de maa beholde oppløsningen.
+  if (rel.startsWith('font/')) return null;
+  // Rammedelene (art/grafikk/ramme/) er maalt opp i ramme.json - de maa ikke beskjaeres.
+  if (rel.startsWith('grafikk/ramme/')) return null;
+  // Grafikk (logo og lignende) som allerede er gjennomsiktig, er ferdig - smaa
+  // biter som et utropstegn eller en blomst skal ikke fjernes.
+  if (rel.startsWith('grafikk/') && andelGjennomsiktig(decode(f)) > 0.01) return null;
+  const bane = rel.startsWith('bane/');
+  const navn = path.basename(f).toLowerCase();
+  if (bane && /^(himmel|bakke)/.test(navn)) return null;
   const before = fs.statSync(f).size;
   let im = decode(f);
-  const removed = stripBackground(im);
-  const { fjernet, biter } = despeckle(im);
-  // Flere tydelige biter = et delark med mange kroppsdeler. Da beholder vi
-  // oppløsningen, ellers blir hver del bitteliten naar arket krympes til 512.
-  const erArk = biter >= 3;
-  if (!force && removed < 0.02 && !fjernet && (erArk || Math.max(im.w, im.h) <= MAX_SIZE)) return null;
-  im = crop(im);
-  if (!erArk) im = shrink(im, MAX_SIZE);
+  // Et bilde som allerede har ekte gjennomsiktighet er tegnet slik med vilje:
+  // smaa biter (gnister, draaper, partikler i et skudd) skal da ikke fjernes.
+  const haddeAlfa = andelGjennomsiktig(im) > 0.01;
+  // Et bakgrunnslag som allerede har ekte gjennomsiktighet er ferdig. Ellers
+  // kunne snoe, is og lys dis som naar kanten blitt tatt for bakgrunn.
+  if (bane && !force && andelGjennomsiktig(im) > 0.01) return null;
+  // Ekte gjennomsiktighet = bakgrunnen er allerede borte. Flood-fillen ville ellers
+  // gaa fra den gjennomsiktige kanten rett inn i lyse skyer, roeyk og flammer.
+  const removed = bane || !haddeAlfa ? stripBackground(im) : 0;
+  let erArk = false;
+  if (bane) {
+    if (!force && removed < 0.02) return null;
+    // Lag som gjentas bortover beholder hele lerretet, saa de blir saa store
+    // som du tegnet dem. Plattform, port og sol beskjaeres som figurer.
+    if (/^(plattform|port|sol)/.test(navn)) im = crop(im);
+  } else {
+    // Effekter (treff, stoev ...) kan ha flere smaa biter med vilje - de beholdes.
+    const effekt = rel.startsWith('effekter/');
+    const { fjernet, biter } = despeckle(im, effekt ? 0.01 : 0.04, haddeAlfa);
+    // Flere tydelige biter = et delark med mange kroppsdeler. Da beholder vi
+    // oppløsningen, ellers blir hver del bitteliten naar arket krympes til 512.
+    // Ting (mynt, skudd ...) og effekter er aldri et delark.
+    erArk = !effekt && !rel.startsWith('ting/') && biter >= 3;
+    if (!force && removed < 0.02 && !fjernet && (erArk || Math.max(im.w, im.h) <= MAX_SIZE)) return null;
+    // Nivaaer og tilstander av samme del (vapen-kanon3.png, rygg-jet3-flamme.png) ligger
+    // paa felles lerret, saa de passer med samme rigg - de beskjaeres ikke hver for seg.
+    const fellesLerret = /-[a-z]+\d+(-[a-z]+)?\.png$/.test(navn) || /-flamme\.png$/.test(navn);
+    if (!fellesLerret) im = crop(im);
+    if (!erArk) im = shrink(im, MAX_SIZE);
+  }
   const out = encode(im);
   fs.mkdirSync(path.dirname(backup), { recursive: true });
   if (!fs.existsSync(backup)) fs.copyFileSync(f, backup);
@@ -354,8 +418,8 @@ function ryddMappe(dir, opt = {}) {
 
 module.exports = {
   ryddFil, ryddMappe, finnPngFiler,
-  // byggeklosser, brukt av verktoy/del-opp.js
-  decode, encode, stripBackground, despeckle, crop, shrink, MAX_SIZE,
+  // byggeklosser, brukt av verktoy/del-opp.js og verktoy/somlos.js
+  decode, encode, stripBackground, despeckle, crop, shrink, bgLike, andelGjennomsiktig, MAX_SIZE,
 };
 
 // ------------------------------------------------------------------

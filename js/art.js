@@ -5,8 +5,43 @@
 // trengs for at spillet skal se ferdig ut.
 
 import { TAU, clamp } from './core.js';
+import { tex } from './sprites.js';
+import { tegnTekst } from './skrift.js';
 
 export const OUT = '#141a2e';
+
+// ------------------------------------------------------------------
+//  EGNE BILDER FOR BANEN OG TINGENE I DEN
+//  art/bane/<tema>/  himmel, sol, langt, midt, naer, bakke, plattform, port
+//  art/ting/         mynt, hjerte, lyn, stjerne, skudd-1 ... skudd-5, fiendeskudd
+//  art/effekter/     fiendeskuddene, sjokkboelgen, poff, treff, slag, jetflamme, stoev
+//  Finnes ikke fila, tegnes det som foer. Se art/LES-MEG.md.
+// ------------------------------------------------------------------
+export const BANE_BILDER = ['himmel', 'sol', 'langt', 'midt', 'naer', 'bakke', 'plattform', 'port'];
+export const TING_BILDER = ['mynt', 'hjerte', 'lyn', 'stjerne', 'skudd-1', 'skudd-2', 'skudd-3',
+  'skudd-4', 'skudd-5', 'fiendeskudd'];
+export const EFFEKT_BILDER = ['ildkule', 'iskule', 'magikule', 'giftkule', 'kongekule', 'sjokkbolge',
+  'poff', 'treff', 'slag', 'slag-1', 'slag-2', 'slag-3', 'slag-4', 'slag-5', 'jetflamme', 'stov'];
+export const banePath = (th, navn) => 'art/bane/' + th.key + '/' + navn + '.png';
+export const tingPath = (navn) => 'art/ting/' + navn + '.png';
+export const effektPath = (navn) => 'art/effekter/' + navn + '.png';
+const baneBilde = (th, navn) => (th.key ? tex(banePath(th, navn)) : null);
+const tingBilde = (navn) => tex(tingPath(navn));
+export const effektBilde = (navn) => tex(effektPath(navn));
+
+// Hvilket bilde et fiendeskudd faar, ut fra fargen det skytes med (se content.js
+// og bossAI i game.js). Mangler bildet, brukes fiendeskudd.png, og ellers en kule.
+const SKUDD_BILDE = {
+  '#ff9a3d': 'ildkule', '#bdf0ff': 'iskule', '#c9a3ff': 'magikule',
+  '#8ef0c0': 'giftkule', '#ff6b6b': 'kongekule',
+};
+
+/** Begynner aa hente bildene for et tema (og tingene og effektene) med en gang. */
+export function lastTema(th) {
+  if (th.key) BANE_BILDER.forEach((n) => tex(banePath(th, n)));
+  TING_BILDER.forEach((n) => tex(tingPath(n)));
+  EFFEKT_BILDER.forEach((n) => tex(effektPath(n)));
+}
 
 // --- smaa hjelpere ------------------------------------------------
 export function rr(ctx, x, y, w, h, r, fill, stroke, lw) {
@@ -518,16 +553,43 @@ export function drawCreature(ctx, e, t) {
 // ==================================================================
 //  BAKGRUNN OG BANE
 // ==================================================================
-export function drawBackground(ctx, th, camX, W, H, t) {
-  const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, th.sky[0]);
-  g.addColorStop(1, th.sky[1]);
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
+/**
+ * Et bakgrunnslag som gjentas bortover: saa hoeyt som `hoyde` paa skjermen,
+ * med bunnen paa `bunnY`, forskjoevet `skyv` piksler.
+ */
+function lag(ctx, img, skyv, hoyde, bunnY, W) {
+  const w = img.naturalWidth * (hoyde / img.naturalHeight);
+  const ox = (skyv % w + w) % w;
+  for (let x = -ox; x < W; x += w) ctx.drawImage(img, x, bunnY - hoyde, w + 0.5, hoyde);
+}
 
-  if (th.stars) {
+/**
+ * Himmel og bakgrunn, i skjermkoordinater. camY og z er kameraets hoeyde og
+ * zoom - lagene langt borte flytter seg mindre enn bakken naar kameraet flytter seg.
+ */
+export function drawBackground(ctx, th, camX, camY, z, W, H, t, groundY) {
+  const hor = (groundY - camY) * z;              // der bakken er paa skjermen
+  const dyp = hor - H * 0.837;                   // hvor mye kameraet har loeftet seg
+  // Hvor langt et lag er skjoevet: regnet fra midten av utsnittet og ved en fast
+  // zoom, ellers ville lagene gli sidelengs hver gang kameraet zoomer inn eller ut.
+  const midtX = camX + W / (2 * z);
+  const skyv = (fart) => midtX * fart * 1.5;
+  const himmel = baneBilde(th, 'himmel');
+  if (himmel) {
+    // litt hoeyere enn skjermen, saa det aldri blir en glipe naar kameraet loefter seg
+    lag(ctx, himmel, skyv(0.05), H * 1.2, H * 1.1 + dyp * 0.08, W);
+  } else {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, th.sky[0]);
+    g.addColorStop(1, th.sky[1]);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  const sol = baneBilde(th, 'sol');
+  if (!himmel && th.stars) {
     ctx.save();
-    const ox = camX * 0.06;
+    const ox = skyv(0.04);
     for (let i = 0; i < 90; i++) {
       const sx = ((h1(i) * 3000 - ox) % 3000 + 3000) % 3000;
       if (sx > W + 10) continue;
@@ -537,30 +599,55 @@ export function drawBackground(ctx, th, camX, W, H, t) {
       ctx.fillRect(sx, sy, 2.5, 2.5);
     }
     ctx.restore();
-  } else {
+  } else if (!himmel && !sol) {
     ctx.save();
     ctx.globalAlpha = 0.5;
-    circ(ctx, W * 0.78 - camX * 0.02, H * 0.18, H * 0.075, '#fff3c4');
+    circ(ctx, W * 0.78 - skyv(0.013), H * 0.18, H * 0.075, '#fff3c4');
     ctx.restore();
   }
 
-  const fo = camX * 0.18, fs = 300;
-  ctx.fillStyle = th.far;
-  let i0 = Math.floor(fo / fs) - 1;
-  for (let i = i0; i < i0 + Math.ceil(W / fs) + 3; i++) {
-    const px = i * fs - fo;
-    const r = fs * (0.55 + h1(i) * 0.45);
-    ell(ctx, px, H * 0.82, r, H * (0.22 + h2(i) * 0.16));
+  // Sola, maanen eller planeten er et eget bilde, saa den bare synes en gang
+  // selv om himmelen gjentas bortover. En egen himmel uten sol.png faar ingen sol.
+  if (sol) {
+    const hh = H * 0.22, ww = hh * (sol.naturalWidth / sol.naturalHeight);
+    ctx.drawImage(sol, W * 0.78 - skyv(0.013) - ww / 2, H * 0.18 + dyp * 0.08 - hh / 2, ww, hh);
   }
 
-  const mo = camX * 0.42, ms = 200;
-  ctx.fillStyle = th.mid;
-  i0 = Math.floor(mo / ms) - 1;
-  for (let i = i0; i < i0 + Math.ceil(W / ms) + 3; i++) {
-    const px = i * ms - mo + h1(i * 7) * 70;
-    const hh = H * (0.16 + h2(i * 5) * 0.22);
-    midShape(ctx, px, H * 0.84, hh, th.form, i);
+  // Lagene staar paa horisonten, men aldri slik at det blir en glipe ned til bakken.
+  const langtBunn = Math.max(H * 0.85 + dyp * 0.3, hor + 4);
+  const midtBunn = Math.max(H * 0.86 + dyp * 0.6, hor + 4);
+
+  const langt = baneBilde(th, 'langt');
+  if (langt) {
+    lag(ctx, langt, skyv(0.18), H * 0.55, langtBunn, W);
+  } else {
+    const fo = skyv(0.18), fs = 300;
+    ctx.fillStyle = th.far;
+    const i0 = Math.floor(fo / fs) - 1;
+    for (let i = i0; i < i0 + Math.ceil(W / fs) + 3; i++) {
+      const px = i * fs - fo;
+      const r = fs * (0.55 + h1(i) * 0.45);
+      ell(ctx, px, langtBunn - H * 0.03, r, H * (0.22 + h2(i) * 0.16));
+    }
   }
+
+  const midt = baneBilde(th, 'midt');
+  if (midt) {
+    lag(ctx, midt, skyv(0.42), H * 0.4, midtBunn, W);
+  } else {
+    const mo = skyv(0.42), ms = 200;
+    ctx.fillStyle = th.mid;
+    const i0 = Math.floor(mo / ms) - 1;
+    for (let i = i0; i < i0 + Math.ceil(W / ms) + 3; i++) {
+      const px = i * ms - mo + h1(i * 7) * 70;
+      const hh = H * (0.16 + h2(i * 5) * 0.22);
+      midShape(ctx, px, midtBunn - H * 0.02, hh, th.form, i);
+    }
+  }
+
+  // naermeste lag (bare hvis du har laget det) - glir nesten like fort som bakken
+  const naer = baneBilde(th, 'naer');
+  if (naer) lag(ctx, naer, skyv(0.75), H * 0.25, hor + 6, W);
 }
 
 function midShape(ctx, x, baseY, hh, form, i) {
@@ -593,38 +680,83 @@ function midShape(ctx, x, baseY, hh, form, i) {
   }
 }
 
-export function drawGround(ctx, th, camX, W, H, groundY) {
+// Hvor hoeyt bakkebildet tegnes, i verdensenheter. Den oeverste tolvdelen
+// stikker opp over bakkekanten (gress, steiner), resten ligger under.
+const BAKKE_H = 120;
+
+/** Bakken, i verdensenheter - fra venstre til hoeyre kant av det kameraet ser. */
+export function drawGround(ctx, th, camX, camY, viewW, viewH, groundY) {
+  // god margin rundt, saa bakken ogsaa dekker kantene naar skjermen rister
+  const x0 = camX - 80, x1 = camX + viewW + 80, bunn = camY + viewH + 80;
+  const bakke = baneBilde(th, 'bakke');
+  if (bakke) {
+    const topp = groundY - BAKKE_H / 12;
+    const iw = bakke.naturalWidth, ih = bakke.naturalHeight;
+    const w = iw * (BAKKE_H / ih);
+    const under = Math.max(0, bunn - topp - BAKKE_H + 1);
+    for (let x = Math.floor(x0 / w) * w; x < x1; x += w) {
+      ctx.drawImage(bakke, x, topp, w + 0.5, BAKKE_H);
+      // under bildet fortsetter den nederste raden, saa fargen blir den samme
+      if (under > 0) ctx.drawImage(bakke, 0, ih - 1, iw, 1, x, topp + BAKKE_H - 1, w + 0.5, under);
+    }
+    return;
+  }
   ctx.fillStyle = th.ground2;
-  ctx.fillRect(0, groundY, W, H - groundY);
+  ctx.fillRect(x0, groundY, x1 - x0, bunn - groundY);
   ctx.fillStyle = th.ground;
-  ctx.fillRect(0, groundY, W, Math.min(26, (H - groundY) * 0.34));
+  ctx.fillRect(x0, groundY, x1 - x0, 26);
   ctx.strokeStyle = OUT;
   ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.moveTo(0, groundY + 2);
-  ctx.lineTo(W, groundY + 2);
+  ctx.moveTo(x0, groundY + 2);
+  ctx.lineTo(x1, groundY + 2);
   ctx.stroke();
   ctx.save();
   ctx.globalAlpha = 0.22;
   ctx.fillStyle = OUT;
   const sp = 64;
-  const ox = camX % sp;
-  for (let x = -ox; x < W; x += sp) {
+  for (let x = Math.floor(x0 / sp) * sp; x < x1; x += sp) {
     ctx.fillRect(x, groundY + 34, 22, 6);
     ctx.fillRect(x + 32, groundY + 58, 16, 6);
   }
   ctx.restore();
 }
 
-export function drawPlatform(ctx, p, th, camX) {
-  const x = p.x - camX;
-  rr(ctx, x, p.y, p.w, p.h, 8, th.ground2, OUT, 4);
-  rr(ctx, x + 4, p.y + 3, p.w - 8, Math.min(12, p.h * 0.5), 6, th.ground);
+/**
+ * Plattform. Med eget bilde er oeverste kant der figurene staar. Venstre og
+ * hoeyre ende (et kvadrat hver, like hoeyt som bildet) blir staaende som de
+ * er, og midten strekkes til bredden.
+ */
+export function drawPlatform(ctx, p, th) {
+  const img = baneBilde(th, 'plattform');
+  if (img) {
+    const hoyde = p.h + 14, y = p.y - 2;
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    const kant = Math.min(ih, iw / 3);
+    const kw = Math.min(kant * (hoyde / ih), p.w / 2);
+    ctx.drawImage(img, 0, 0, kant, ih, p.x, y, kw, hoyde);
+    ctx.drawImage(img, kant, 0, iw - kant * 2, ih, p.x + kw - 0.5, y, p.w - kw * 2 + 1, hoyde);
+    ctx.drawImage(img, iw - kant, 0, kant, ih, p.x + p.w - kw, y, kw, hoyde);
+    return;
+  }
+  rr(ctx, p.x, p.y, p.w, p.h, 8, th.ground2, OUT, 4);
+  rr(ctx, p.x + 4, p.y + 3, p.w - 8, Math.min(12, p.h * 0.5), 6, th.ground);
 }
 
 export function drawGate(ctx, x, groundY, th, t, open) {
   const w = 54, h = 250;
   const y = groundY - h;
+  const img = baneBilde(th, 'port');
+  if (img) {
+    const bw = h * (img.naturalWidth / img.naturalHeight);
+    ctx.save();
+    ctx.globalAlpha = open ? 0.25 : 1;
+    // venstre kant der den innebygde porten har sin: kameraet stopper ved veggen,
+    // saa en bred port vokser inn i arenaen i stedet for ut av skjermen
+    ctx.drawImage(img, x - w / 2, y, bw, h);
+    ctx.restore();
+    return;
+  }
   ctx.save();
   if (open) ctx.globalAlpha = 0.25;
   rr(ctx, x - w / 2, y, w, h, 10, th.mid, OUT, 5);
@@ -643,6 +775,17 @@ export function drawGate(ctx, x, groundY, th, t, open) {
 export function drawCoin(ctx, c, t) {
   const s = Math.abs(Math.cos(t * 5 + c.seed));
   const r = c.r;
+  const img = tingBilde('mynt');
+  if (img) {
+    // eget myntbilde - klemmes sammen og ut igjen, saa den ser ut til aa snurre
+    const hh = r * 2.4, ww = hh * (img.naturalWidth / img.naturalHeight);
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.scale(Math.max(0.18, s), 1);
+    ctx.drawImage(img, -ww / 2, -hh / 2, ww, hh);
+    ctx.restore();
+    return;
+  }
   ctx.save();
   ctx.translate(c.x, c.y);
   ell(ctx, 0, 0, Math.max(r * 0.18, r * s), r, GOLD, GOLD_D, 3);
@@ -682,7 +825,11 @@ export function drawPowerup(ctx, h, t) {
   circ(ctx, h.x, y, r * 1.85, col);
   ctx.globalAlpha = 1;
 
-  if (h.kind === 'heal') {
+  const img = tingBilde(h.kind === 'heal' ? 'hjerte' : h.kind === 'rate' ? 'lyn' : 'stjerne');
+  if (img) {
+    const hh = r * 2.3, ww = hh * (img.naturalWidth / img.naturalHeight);
+    ctx.drawImage(img, h.x - ww / 2, y - hh / 2, ww, hh);
+  } else if (h.kind === 'heal') {
     drawHeart(ctx, h.x, y, r * 0.95, t);
   } else {
     rr(ctx, h.x - r, y - r, r * 2, r * 2, r * 0.55,
@@ -715,7 +862,13 @@ function drawShot(ctx, b) {
   ctx.translate(b.x, b.y);
   ctx.rotate(ang);
 
-  if (lvl <= 1) {
+  // eget bilde for dette kanonnivaaet - eller for det naermeste nivaaet under
+  let img = null;
+  for (let k = Math.max(1, lvl); k >= 1 && !img; k--) img = tingBilde('skudd-' + k);
+  if (img) {
+    const ww = r * 4.2, hh = ww * (img.naturalHeight / img.naturalWidth);
+    ctx.drawImage(img, -ww / 2, -hh / 2, ww, hh);
+  } else if (lvl <= 1) {
     ctx.globalAlpha = 0.4;
     circ(ctx, 0, 0, r * 2, '#5ee6ff');
     ctx.globalAlpha = 1;
@@ -785,6 +938,18 @@ export function drawBullet(ctx, b) {
     return;
   }
   if (b.shock) {
+    const bolge = effektBilde('sjokkbolge');
+    if (bolge) {
+      // eget bilde: staar paa bakken og ruller i fartsretningen (tegnet mot hoeyre)
+      const hh = b.r * 2.6 * (1 + 0.06 * Math.sin(b.x * 0.08));
+      const ww = hh * (bolge.naturalWidth / bolge.naturalHeight);
+      ctx.save();
+      ctx.translate(b.x, b.y + b.r * 0.9);
+      if (b.vx < 0) ctx.scale(-1, 1);
+      ctx.drawImage(bolge, -ww / 2, -hh, ww, hh);
+      ctx.restore();
+      return;
+    }
     // rullende boelge - bred og tydelig, saa den leses som "hopp over meg"
     ctx.save();
     ctx.globalAlpha = 0.35;
@@ -802,8 +967,17 @@ export function drawBullet(ctx, b) {
     circ(ctx, b.x, b.y + b.r * 0.1, b.r * 0.42, '#fff3b0');
     return;
   }
+  const fiende = b.friendly ? null
+    : (SKUDD_BILDE[b.color] && effektBilde(SKUDD_BILDE[b.color])) || tingBilde('fiendeskudd');
   if (b.friendly) {
     drawShot(ctx, b);
+  } else if (fiende) {
+    const ww = b.r * 3.2, hh = ww * (fiende.naturalHeight / fiende.naturalWidth);
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(Math.atan2(b.vy, b.vx));
+    ctx.drawImage(fiende, -ww / 2, -hh / 2, ww, hh);
+    ctx.restore();
   } else {
     ctx.save();
     ctx.globalAlpha = 0.4;
@@ -848,6 +1022,21 @@ export function drawLaser(ctx, l) {
 /** Hammerslaget - en halvsirkel der det smeller. */
 export function drawSmash(ctx, s) {
   const a = clamp(s.life / s.max, 0, 1);
+  // eget bilde for hammernivaaet (slag-3.png), ellers slag.png - men bare ved treff
+  let img = null;
+  for (let k = s.niva | 0; k >= 1 && !img && !s.bom; k--) img = effektBilde('slag-' + k);
+  if (!s.bom) img = img || effektBilde('slag');
+  if (img) {
+    // vokser og blekner der hammeren treffer, med bunnen litt under midten av roboten
+    const hh = s.r * 1.3 * (0.75 + (1 - a) * 0.45), ww = hh * (img.naturalWidth / img.naturalHeight);
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, a * 1.6);
+    ctx.translate(s.x, s.y + s.r * 0.45);
+    if (s.retning < 0) ctx.scale(-1, 1);
+    ctx.drawImage(img, -ww / 2, -hh, ww, hh);
+    ctx.restore();
+    return;
+  }
   ctx.save();
   ctx.globalAlpha = a * 0.8;
   ctx.strokeStyle = '#ffe9a8';
@@ -858,7 +1047,55 @@ export function drawSmash(ctx, s) {
   ctx.restore();
 }
 
+/** Flamme ut av jetpakken, rett nedover fra dysen. */
+export function drawJetFlame(ctx, x, y, size, t) {
+  const f = 0.85 + 0.2 * Math.sin(t * 43) + 0.1 * Math.sin(t * 71);
+  const img = effektBilde('jetflamme');
+  if (img) {
+    // eget bilde, tegnet med spissen nedover: bredden staar stille, lengden flakker
+    const hh = size * 1.9, ww = hh * (img.naturalWidth / img.naturalHeight);
+    ctx.save();
+    ctx.globalAlpha = 0.95;
+    ctx.drawImage(img, x - ww / 2, y - size * 0.1, ww, hh * f);
+    ctx.restore();
+    return;
+  }
+  const len = size * 1.7 * f;
+  const tunge = (k, color) => {
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.42 * k, 0);
+    ctx.quadraticCurveTo(-size * 0.3 * k, len * 0.6 * k, 0, len * k);
+    ctx.quadraticCurveTo(size * 0.3 * k, len * 0.6 * k, size * 0.42 * k, 0);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  };
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.globalAlpha = 0.9;
+  tunge(1, '#ff8a1e');
+  tunge(0.65, '#ffd93d');
+  tunge(0.32, '#fff6d0');
+  ctx.restore();
+}
+
 export function drawParticle(ctx, p) {
+  if (p.kind === 'bilde') {
+    // poff, treff og stoev: vokser fra 'fra' til 'til' og blekner mot slutten
+    const img = effektBilde(p.navn);
+    if (!img) return;
+    const a = clamp(p.life / p.max, 0, 1);
+    const hh = p.r * 2 * (p.fra + (p.til - p.fra) * (1 - a));
+    const ww = hh * (img.naturalWidth / img.naturalHeight);
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, a * 2);
+    ctx.translate(p.x, p.y);
+    if (p.rot) ctx.rotate(p.rot);
+    if (p.speil) ctx.scale(-1, 1);
+    ctx.drawImage(img, -ww / 2, p.bunn ? -hh : -hh / 2, ww, hh);
+    ctx.restore();
+    return;
+  }
   ctx.save();
   ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
   if (p.kind === 'ring') {
@@ -872,6 +1109,8 @@ export function drawParticle(ctx, p) {
 export function drawFloatText(ctx, ft) {
   ctx.save();
   ctx.globalAlpha = clamp(ft.life / ft.max, 0, 1);
+  // bildefonten (art/font/spillfont.png) hvis den er lastet
+  if (tegnTekst(ctx, ft.text, ft.x, ft.y, ft.size * 0.78, { farge: ft.color })) { ctx.restore(); return; }
   ctx.font = 'bold ' + ft.size + 'px Verdana, sans-serif';
   ctx.textAlign = 'center';
   ctx.lineWidth = 5;

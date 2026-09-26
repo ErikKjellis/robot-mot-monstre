@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banetest - Robot mot Monstre</title>
+<style>
+  :root{ --ink:#0d1220; --panel:#18203a; --panel2:#222c4e; --paper:#eaf0ff;
+         --green:#39c26a; --red:#ef4d5a; --yellow:#f7c33a; --blue:#3aa0ee; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ink);color:var(--paper);
+       font-family:"Verdana","Segoe UI",system-ui,sans-serif;font-size:15px}
+  header{padding:14px 20px;border-bottom:2px solid #2b3557;display:flex;
+         align-items:baseline;gap:14px;flex-wrap:wrap}
+  h1{font-size:20px;margin:0;letter-spacing:1px}
+  header p{margin:0;opacity:.6;font-size:13px}
+  .wrap{display:flex;gap:18px;padding:18px;align-items:flex-start;flex-wrap:wrap}
+  .stage{border-radius:16px;border:3px solid #2b3557;flex:1 1 560px;min-width:320px;overflow:hidden}
+  canvas{display:block;width:100%;height:auto}
+  .side{flex:0 0 330px;display:flex;flex-direction:column;gap:14px;min-width:290px}
+  .card{background:var(--panel);border:2px solid #2b3557;border-radius:14px;padding:12px 14px}
+  .card h2{margin:0 0 10px;font-size:14px;letter-spacing:2px;opacity:.75;text-transform:uppercase}
+  label{display:flex;align-items:center;gap:8px;margin:7px 0;font-size:14px}
+  select,input[type=range]{flex:1}
+  select{background:var(--panel2);color:var(--paper);border:2px solid #38456f;
+         border-radius:8px;padding:6px 8px;font-family:inherit;font-size:14px}
+  .parts{list-style:none;margin:0;padding:0;font-size:13px}
+  .parts li{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:7px}
+  .parts li+li{margin-top:2px}
+  .parts .ok{background:rgba(57,194,106,.14)}
+  .parts .missing{background:rgba(239,77,90,.10);opacity:.75}
+  .parts code{font-family:Consolas,monospace;font-size:12px;opacity:.85;
+              overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+  .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+  .ok .dot{background:var(--green)} .missing .dot{background:var(--red)}
+  .hint{font-size:12.5px;line-height:1.55;opacity:.72;margin:8px 0 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>&#127966;&#65039; Banetest</h1>
+  <p>Se dine egne bakgrunner, bakke, plattformer, ting og effekter slik de blir i spillet.</p>
+</header>
+
+<div class="wrap">
+  <div class="stage"><canvas id="c" width="960" height="540"></canvas></div>
+
+  <div class="side">
+    <div class="card">
+      <h2>Tema</h2>
+      <label><select id="tema"></select></label>
+      <label>Fart <input id="fart" type="range" min="0" max="600" value="160"></label>
+      <label>Kamera opp <input id="opp" type="range" min="0" max="300" value="0"></label>
+      <p class="hint">Dra &laquo;Kamera opp&raquo; for &aring; se hvordan lagene flytter seg
+        n&aring;r roboten klatrer eller flyr h&oslash;yt.</p>
+    </div>
+    <div class="card">
+      <h2>Banen</h2>
+      <ul id="bane" class="parts"></ul>
+    </div>
+    <div class="card">
+      <h2>Ting</h2>
+      <ul id="ting" class="parts"></ul>
+    </div>
+    <div class="card">
+      <h2>Effekter</h2>
+      <ul id="effekter" class="parts"></ul>
+      <p class="hint">Gr&oslash;nn = funnet. R&oslash;d = ikke laget enn&aring; &ndash; da tegner spillet
+        den selv. Se <a href="../art/LES-MEG.md">art/LES-MEG.md</a>.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { setBase, setBust, status } from '../js/sprites.js';
+import { THEMES, LEVELS } from '../js/content.js';
+import { GROUND_Y } from '../js/game.js';
+import * as art from '../js/art.js';
+
+setBase('../');            // art/ ligger ett hakk opp fra verktoy/
+setBust(true);             // hent alltid ferske filer mens du tegner
+
+const ZOOM = 1.5;          // samme zoom som i spillet
+const W = 960, H = 540;
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const dpr = Math.min(window.devicePixelRatio || 1, 2);
+canvas.width = W * dpr; canvas.height = H * dpr;
+ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+const velg = document.getElementById('tema');
+for (const key of Object.keys(THEMES)) {
+  const niva = LEVELS.findIndex((L) => L.theme === key);
+  const o = document.createElement('option');
+  o.value = key;
+  o.textContent = key + (niva >= 0 ? '  (nivå ' + (niva + 1) + ')' : '');
+  velg.appendChild(o);
+}
+
+// litt av en bane: plattformer, mynter, kraftpakker og skudd som flyr forbi
+const platforms = [
+  { x: 380, y: 360, w: 180, h: 26 }, { x: 640, y: 280, w: 130, h: 26 },
+  { x: 1150, y: 350, w: 230, h: 26 }, { x: 1620, y: 300, w: 150, h: 26 },
+];
+const coins = [];
+for (let i = 0; i < 14; i++) coins.push({ x: 300 + i * 140, y: GROUND_Y - 30 - (i % 3) * 30, r: 11, seed: i });
+const pickups = [
+  { x: 700, y: 245, r: 17, kind: 'rate', seed: 1 },
+  { x: 1260, y: 315, r: 17, kind: 'star', seed: 2 },
+  { x: 1700, y: 265, r: 17, kind: 'heal', seed: 3 },
+];
+const LENGDE = 2200;
+const FIENDESKUDD = ['#ff9a3d', '#bdf0ff', '#c9a3ff', '#8ef0c0', '#ff6b6b'];
+
+function liste(id, rader) {
+  const ul = document.getElementById(id);
+  const html = rader.map(([navn, path]) => {
+    const ok = status(path) === 'ok';
+    return '<li class="' + (ok ? 'ok' : 'missing') + '"><span class="dot"></span><b>' + navn +
+      '</b><code>' + path + '</code></li>';
+  }).join('');
+  if (ul.innerHTML !== html) ul.innerHTML = html;
+}
+
+let camX = 0, t = 0, last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now; t += dt;
+  const th = THEMES[velg.value];
+  art.lastTema(th);
+  camX += +document.getElementById('fart').value * dt;
+  const viewW = W / ZOOM, viewH = H / ZOOM;
+  const camY = GROUND_Y + 60 - viewH - +document.getElementById('opp').value;
+
+  ctx.clearRect(0, 0, W, H);
+  art.drawBackground(ctx, th, camX, camY, ZOOM, W, H, t, GROUND_Y);
+  ctx.save();
+  ctx.scale(ZOOM, ZOOM);
+  ctx.translate(-camX, -camY);
+  art.drawGround(ctx, th, camX, camY, viewW, viewH, GROUND_Y);
+  // banen gjentas, saa den aldri tar slutt (kameraet ruller videre, saa lagene ikke hopper)
+  const start = Math.floor(camX / LENGDE) * LENGDE;
+  for (const skyv of [start, start + LENGDE]) {
+    ctx.save();
+    ctx.translate(skyv, 0);
+    for (const p of platforms) art.drawPlatform(ctx, p, th);
+    art.drawGate(ctx, 1900, GROUND_Y, th, t, false);
+    for (const c of coins) art.drawCoin(ctx, c, t);
+    for (const h of pickups) art.drawPowerup(ctx, h, t);
+    for (let k = 1; k <= 5; k++) {
+      const x = 200 + ((t * 260 + k * 170) % 1800);
+      art.drawBullet(ctx, { x, y: 170 + k * 26, vx: 1, vy: 0, r: 7 + k * 1.2, friendly: true, tier: k });
+    }
+    // fiendeskuddene, ett av hver slag, paa vei mot venstre
+    FIENDESKUDD.forEach((color, k) => {
+      art.drawBullet(ctx, { x: 1800 - ((t * 200 + k * 260) % 1600), y: 300 + k * 18, vx: -1, vy: 0, r: 10, color });
+    });
+    // sjokkboelgen ruller bortover bakken
+    art.drawBullet(ctx, { x: 150 + ((t * 250) % 1700), y: GROUND_Y - 20, vx: 1, vy: 0, r: 19, shock: true, warn: 0 });
+    // effektene paa rad, om og om igjen
+    const syklus = (lengde, pause) => Math.max(0, lengde - (t % (lengde + pause)));
+    const fx = 980, fy = GROUND_Y - 60;
+    const poff = syklus(0.45, 0.6);
+    art.drawParticle(ctx, { kind: 'bilde', navn: 'poff', x: fx, y: fy, r: 34, life: poff, max: 0.45, fra: 0.7, til: 1.35 });
+    const treff = syklus(0.18, 0.5);
+    art.drawParticle(ctx, { kind: 'bilde', navn: 'treff', x: fx + 90, y: fy, r: 18, life: treff, max: 0.18, fra: 0.6, til: 1.1, rot: Math.floor(t / 0.68) });
+    const slag = syklus(0.25, 0.6);
+    if (slag > 0) art.drawSmash(ctx, { x: fx + 180, y: fy, r: 50, life: slag, max: 0.25, niva: 1 + (Math.floor(t / 0.85) % 5), retning: 1 });
+    art.drawJetFlame(ctx, fx + 270, fy - 30, 16, t);
+    const stov = syklus(0.3, 0.6);
+    art.drawParticle(ctx, { kind: 'bilde', navn: 'stov', x: fx + 350, y: GROUND_Y + 2, r: 22, life: stov, max: 0.3, fra: 0.7, til: 1.3, bunn: true });
+    ctx.restore();
+  }
+  ctx.restore();
+
+  liste('bane', art.BANE_BILDER.map((n) => [n, art.banePath(th, n)]));
+  liste('ting', art.TING_BILDER.map((n) => [n, art.tingPath(n)]));
+  liste('effekter', art.EFFEKT_BILDER.map((n) => [n, art.effektPath(n)]));
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

@@ -116,8 +116,13 @@ button{touch-action:none;-webkit-touch-callout:none;}
 /* Hopp og skyt staar diagonalt fra hverandre, saa tommelen treffer
    den ene uten aa dra borti den andre. */
 .pad{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom));display:flex;gap:clamp(14px,3vw,34px);align-items:flex-end;}
-.pad-right{right:calc(12px + env(safe-area-inset-right));}
-.pad-right .shoot{margin-bottom:clamp(44px,9vh,86px);}
+.pad-right{right:calc(12px + env(safe-area-inset-right));
+  display:grid;grid-template-areas:"hammer jet" "shoot jump";
+  column-gap:clamp(14px,3vw,34px);row-gap:clamp(8px,2vh,18px);align-items:end;justify-items:center;}
+.pad-right .shoot{grid-area:shoot;margin-bottom:clamp(44px,9vh,86px);}
+.pad-right .jump{grid-area:jump;}
+.pad-right .hammer{grid-area:hammer;}
+.pad-right .jet{grid-area:jet;}
 .tbtn{
   width:clamp(74px,15.5vh,124px);height:clamp(74px,15.5vh,124px);
   border-radius:50%;border:5px solid rgba(255,255,255,.45);
@@ -131,6 +136,23 @@ button{touch-action:none;-webkit-touch-callout:none;}
 .tbtn.jump{background:rgba(57,194,106,.55);}
 .tbtn.shoot{background:rgba(239,77,90,.55);width:clamp(84px,17.5vh,140px);height:clamp(84px,17.5vh,140px);}
 .tbtn.down{transform:translateY(5px) scale(.95);box-shadow:0 1px 0 rgba(0,0,0,.35);background:rgba(255,255,255,.5);}
+
+/* Hammer og jetpakke - litt mindre enn hopp og skyt, rett over dem */
+.tbtn.hammer,.tbtn.jet{position:relative;width:clamp(62px,13vh,104px);height:clamp(62px,13vh,104px);font-size:clamp(24px,5vh,40px);}
+.tbtn.hammer{background:rgba(240,166,60,.55);overflow:hidden;}
+.tbtn.jet{background:rgba(58,160,238,.55);}
+/* hammeren fylles opp nedenfra mens den lader, og blir helt lys naar den er klar */
+.tbtn.hammer .klar{position:absolute;left:0;right:0;bottom:0;height:calc(var(--klar,1) * 100%);
+  background:rgba(255,224,102,.35);pointer-events:none;}
+.tbtn.hammer.venter{opacity:.6;}
+/* tanken ved siden av jetknappen: gul naar den er full, roed naar den er nesten tom */
+.tbtn.jet .tank{position:absolute;left:clamp(-20px,-2.2vh,-14px);bottom:10%;width:clamp(10px,1.6vh,14px);height:80%;
+  border-radius:8px;background:rgba(12,18,38,.72);border:2px solid rgba(255,255,255,.6);overflow:hidden;pointer-events:none;}
+.tbtn.jet .tank b{position:absolute;left:0;right:0;bottom:0;height:calc(var(--tank,1) * 100%);
+  background:linear-gradient(#ffe066,#ff8a1e);}
+.tbtn.jet.lav .tank b{background:#ef4d5a;}
+.tbtn.jet.flyr{background:rgba(255,179,71,.7);}
+.tbtn.jet.tom{opacity:.55;}
 
 /* ===================== SCREENS ===================== */
 #screens{position:absolute;inset:0;pointer-events:none;}
@@ -182,6 +204,64 @@ h2{font-size:clamp(24px,5.6vh,46px);letter-spacing:2px;}
       filter:drop-shadow(0 6px 0 rgba(0,0,0,.35));align-self:center;}
 #tittel:not(.uten-logo) .t1,#tittel:not(.uten-logo) .t2,#tittel:not(.uten-logo) .t3{display:none;}
 #tittel.uten-logo .logo{display:none;}
+
+/* Knappene paa startskjermen med egne bilder (art/grafikk/knapp-*.png).
+   main.js setter .knappebilder paa <html> foerst naar bildene er lastet,
+   ellers ser knappene ut som foer. */
+.knappebilder .bildeknapp{background:transparent center/contain no-repeat;box-shadow:none;border-radius:0;
+  color:transparent;font-size:0;padding:0;min-width:0;}
+.knappebilder .bildeknapp:active{transform:translateY(3px);box-shadow:none;}
+.knappebilder #btnPlay{background-image:url(../art/grafikk/knapp-spill.png);
+  height:calc(var(--btn-h) * 1.3);width:calc(var(--btn-h) * 1.3 * 1.87);align-self:center;}
+.knappebilder #btnPlay:active{background-image:url(../art/grafikk/knapp-spill-trykk.png);}
+.knappebilder #btnScores{background-image:url(../art/grafikk/knapp-highscore.png);
+  height:calc(var(--btn-h) * 1.05);width:calc(var(--btn-h) * 1.05 * 1.86);}
+.knappebilder #btnScores:active{background-image:url(../art/grafikk/knapp-highscore-trykk.png);}
+.knappebilder #btnSound{background-image:url(../art/grafikk/knapp-lyd.png);
+  height:calc(var(--btn-h) * 1.05);width:calc(var(--btn-h) * 1.05 * 1.2);}
+.knappebilder #btnSound:active{background-image:url(../art/grafikk/knapp-lyd-trykk.png);}
+.knappebilder #btnSound.av{background-image:url(../art/grafikk/knapp-lyd-av.png);}
+.knappebilder #btnFull{background-image:url(../art/grafikk/knapp-fullskjerm.png);
+  height:calc(var(--btn-h) * 1.05);width:calc(var(--btn-h) * 1.05 * 1.18);}
+.knappebilder #btnFull:active{background-image:url(../art/grafikk/knapp-fullskjerm-trykk.png);}
+/* samme knapper paa de andre skjermene */
+.knappebilder #btnShopGo{background-image:url(../art/grafikk/knapp-spill.png);
+  height:calc(var(--btn-h) * 1.25);width:calc(var(--btn-h) * 1.25 * 1.87);align-self:center;}
+.knappebilder #btnShopGo:active{background-image:url(../art/grafikk/knapp-spill-trykk.png);}
+.knappebilder #btnResume{background-image:url(../art/grafikk/knapp-fortsett.png);height:calc(var(--btn-h) * 1.2);width:calc(var(--btn-h) * 1.2 * 1.29);}
+.knappebilder #btnResume:active{background-image:url(../art/grafikk/knapp-fortsett-trykk.png);}
+.knappebilder #btnSound2{background-image:url(../art/grafikk/knapp-lyd.png);height:calc(var(--btn-h) * 1.2);width:calc(var(--btn-h) * 1.2 * 1.2);}
+.knappebilder #btnSound2:active{background-image:url(../art/grafikk/knapp-lyd-trykk.png);}
+.knappebilder #btnSound2.av{background-image:url(../art/grafikk/knapp-lyd-av.png);}
+.knappebilder #btnQuit,.knappebilder #btnScoresBack{background-image:url(../art/grafikk/knapp-hjem.png);
+  height:calc(var(--btn-h) * 1.2);width:calc(var(--btn-h) * 1.2 * 1.28);align-self:center;}
+.knappebilder #btnQuit:active,.knappebilder #btnScoresBack:active{background-image:url(../art/grafikk/knapp-hjem-trykk.png);}
+.knappebilder #btnAgain{background-image:url(../art/grafikk/knapp-igjen.png);height:calc(var(--btn-h) * 1.2);width:calc(var(--btn-h) * 1.2 * 1.06);}
+.knappebilder #btnHome{background-image:url(../art/grafikk/knapp-highscore.png);height:calc(var(--btn-h) * 1.05);width:calc(var(--btn-h) * 1.05 * 1.86);}
+.knappebilder #btnHome:active{background-image:url(../art/grafikk/knapp-highscore-trykk.png);}
+.knappebilder #btnPause{background-image:url(../art/grafikk/knapp-pause.png);background-color:transparent;border:none;
+  width:clamp(48px,8.2vh,66px);height:clamp(44px,7.5vh,60px);}
+/* ikoner i stedet for emoji: stjernen naar du vinner, hodeskallen naar du taper */
+.knappebilder .bildeikon{background:center/contain no-repeat;color:transparent;
+  width:clamp(64px,16vh,120px);height:clamp(60px,15vh,112px);margin:0 auto;}
+.knappebilder .bildeikon.stjerne{background-image:url(../art/grafikk/ikon-stjerne.png);}
+.knappebilder .bildeikon.hodeskalle{background-image:url(../art/grafikk/ikon-hodeskalle.png);}
+/* Vinduene faar en ramme bygd av delene i art/grafikk/ramme/ (js/ramme.js).
+   --ramme er hvor tykk steinkanten blir. Til delene er lastet ser vinduet ut som foer. */
+.panel{--ramme:clamp(16px,3.4vh,26px);}
+.panel.med-ramme{position:relative;isolation:isolate;background:none;border:none;box-shadow:none;
+  padding:calc(var(--ramme) + clamp(8px,1.8vh,16px)) calc(var(--ramme) + clamp(12px,2.4vw,24px));}
+.ramme-lerret{position:absolute;z-index:-1;pointer-events:none;}
+
+/* bildefonten (js/skrift.js): hver bokstav er et lite utsnitt av art/font/spillfont.png */
+.skrift{white-space:nowrap;}
+.skrift-tegn{display:inline-block;vertical-align:baseline;background-repeat:no-repeat;}
+.skrift-rom{display:inline-block;}
+.skrift-mangler{font-weight:900;}
+
+/* navnefeltet kan ikke bruke bildefonten - der brukes den vanlige fonten */
+@font-face{font-family:'Spillfont';src:url(../art/font/Spillfont.ttf) format('truetype');font-display:swap;}
+#nameInput{font-family:'Spillfont',Verdana,sans-serif;}
 
 /* --- Level intro --- */
 .level-card{animation:pop .3s ease;}

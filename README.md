@@ -38,6 +38,8 @@ node serve.js
 | **Styrespak** — legg tommelen hvor som helst i venstre halvdel, så dukker spaken opp der. Dra sidelengs for å gå. | piltaster / A og D |
 | ⬆ grønn knapp nederst til høyre | mellomrom / pil opp / W |
 | 💥 rød knapp litt over og til venstre for hoppeknappen | J, K, Z eller Shift |
+| 🚀 jetknapp over hoppeknappen — **hold** for å fly (dukker opp når du har kjøpt JET) | E |
+| 🔨 hammerknapp over skyteknappen — trykk for å slå (dukker opp når du har kjøpt HAMMER) | Q |
 
 Styrespaken er analog — dytter du den litt, går roboten sakte.
 
@@ -48,8 +50,14 @@ opp. Det er sånn man tar de flygende dragene.
 **Roboten sikter og skyter av seg selv** når du ikke sikter selv — den finner
 nærmeste monster, også det som flyr høyt oppe. Da slipper man å holde
 skyteknappen og hoppeknappen samtidig med samme tommel. Trykker du 💥 selv,
-skyter den litt raskere. Laseren og hammeren går også av seg selv når du har
-kjøpt dem. Du kan dessuten hoppe **oppå** små monstre for å knuse dem.
+skyter den litt raskere. Laseren går også av seg selv når du har kjøpt den.
+Du kan dessuten hoppe **oppå** små monstre for å knuse dem.
+
+**Jetpakken har en tank.** Stripa ved siden av 🚀 viser hvor mye som er igjen: den
+tømmes mens du flyr og fylles igjen når du slipper. På nivå 1 går den fort tom
+og fylles sakte — hvert nivå du kjøper i butikken gjør at den varer lenger og
+fylles raskere. **Hammeren** trenger et lite øyeblikk mellom hvert slag; knappen
+lyser opp når den er klar igjen.
 
 ---
 
@@ -102,6 +110,8 @@ er skrevet for å limes rett inn til AI-en.
 |---|---|
 | **`verktoy/rigger.html`** | **Riggverkstedet** — dra hver kroppsdel på plass, sett leddene, roter og speilvend. Lagrer en `rigg.json` du legger i figurens mappe, så bruker spillet den med en gang. Du trenger ikke røre koden. |
 | `verktoy/figurtest.html` | Viser figuren stor og i bevegelse, og lister hvilke filer som ble funnet |
+| `verktoy/banetest.html` | Viser dine egne bakgrunner, bakke, plattformer, port, ting og effekter slik de blir i spillet |
+| `node verktoy/somlos.js` | Gjør et bakgrunnsbilde klart til å gjentas bortover uten synlig søm |
 | `node verktoy/del-opp.js` | Deler **ett ark** med alle kroppsdelene opp i hver sin PNG — se [art/AI-OPPSKRIFT.md](art/AI-OPPSKRIFT.md) |
 | `node verktoy/fiks-figurer.js art` | Samme opprydding for hånd (`serve.js` gjør det automatisk) |
 
@@ -111,12 +121,24 @@ hver del for seg, og sett dem sammen i riggverkstedet.
 **`node serve.js` rydder bildene automatisk** — både ved oppstart og når du
 legger nye PNG-er i `art/` mens den kjører. Bakgrunnen fjernes (også det grå
 rutemønsteret tegneprogrammer brenner inn i bildet), bildet beskjæres og
-krympes. Originalene tas vare på i `art/original/`.
+krympes. Originalene tas vare på i `art/original/`. Bilder i `art/bane/`
+(bakgrunner og bakke) krympes og beskjæres ikke — der fjernes bare hvit bakgrunn
+på fjellene og trærne.
 
 **Logoen** på startskjermen er `art/grafikk/logo.png` — bytt den ut, så vises den nye. Mangler den, står navnet der som tekst.
+Knappene, ikonene og rammen rundt vinduene ligger også i `art/grafikk/`, og tekstene tegnes med en egen bildefont (`art/font/spillfont.png`, laget med `node verktoy/lag-font.js`). Se **Skrift og knapper** i [art/LES-MEG.md](art/LES-MEG.md).
 
 **Husk mappa:** monstre skal ligge i `art/monstre/<navn>/`, ikke rett i `art/`.
 Roboten ligger i `art/robot/`.
+
+### Bakgrunner, bakke, ting og effekter
+
+Himmel, fjell, bakke, plattformer, porten, mynter, kraftpakker, skudd og effekter
+(ildkuler, sjokkbølger, smell, jetflammen, støv) kan også byttes ut med dine egne
+bilder: bakgrunnene i `art/bane/<tema>/` (ett sett per nivå), tingene i
+`art/ting/` og effektene i `art/effekter/`. Mangler en fil, tegner spillet den selv. Filnavn
+og mål står i [art/LES-MEG.md](art/LES-MEG.md), og `verktoy/banetest.html` viser
+resultatet.
 
 ---
 
@@ -138,8 +160,8 @@ magi som svinger etter roboten.
 
 | | | |
 |---|---|---|
-| 🔫 **KANON** — hardere og raskere skudd. Hvert nivå er et helt nytt våpen: pistol → rifle → dobbeltløp → gatling → energikanon, og skuddene ser forskjellige ut | 👁️ **LASER** — laserøyne som skyter av seg selv | 🔨 **HAMMER** — smeller på alt som kommer nær |
-| 🦿 **BEIN** — løper og hopper bedre | 🛡️ **PANSER** — mer helse og skjold | 🚀 **JET** — dobbelt- og trippelhopp |
+| 🔫 **KANON** — hardere og raskere skudd. Hvert nivå er et helt nytt våpen: pistol → rifle → dobbeltløp → gatling → energikanon, og skuddene ser forskjellige ut | 👁️ **LASER** — laserøyne som skyter av seg selv | 🔨 **HAMMER** — slår når du trykker på hammerknappen |
+| 🦿 **BEIN** — løper og hopper bedre | 🛡️ **PANSER** — mer helse og skjold | 🚀 **JET** — jetpakke du flyr med. For hvert nivå varer tanken lenger og fylles raskere |
 
 Hver kan kjøpes 5 ganger, og **hver eneste en gjør roboten større**.
 Helsa fylles opp ved starten av hvert nivå.
@@ -207,12 +229,18 @@ js/core.js            matte, lagring, lyd (lages i WebAudio), kontroller
 js/content.js         monstre, sjefer, nivåer, oppgraderinger  ← skru her
 js/rigs.js            hvilke kroppsdeler hver figur har         ← figurer
 js/sprites.js         laster PNG-figurer og animerer delene
-js/art.js             spillets egen strektegning (når du ikke har PNG-er)
+js/art.js             bakgrunner, bakke og ting (egne PNG-er eller strektegning)
+js/skrift.js          bildefonten (tekst med bokstavene i art/font/)
+js/ramme.js           bygger rammer av delene i art/grafikk/ramme/
 js/game.js            fysikk, monster-AI, sjefsmønstre
 js/ui.js              HUD, butikk, poengliste
 js/main.js            starter spillet, bytter skjermbilder
-art/                  dine egne figurer  ← se art/LES-MEG.md
+art/                  dine egne figurer og bakgrunner  ← se art/LES-MEG.md
 verktoy/figurtest.html    test dine egne figurer
+verktoy/banetest.html     test dine egne bakgrunner, ting og effekter
+verktoy/somlos.js         gjør bakgrunner klare til å gjentas uten søm
+verktoy/lag-font.js       lager bildefonten av et bokstavark
+verktoy/lag-ramme.js      deler et ark med rammedeler opp i ni biter
 sw.js                 gjør at spillet virker uten nett
 serve.js              liten lokal server for testing
 ```

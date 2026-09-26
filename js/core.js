@@ -140,6 +140,9 @@ class Sound {
   nope() { this.tone(180, 0.14, { to: 120, v: 0.18, type: 'sawtooth' }); }
   laser() { this.tone(1600, 0.18, { to: 380, v: 0.16, type: 'sawtooth' }); this.noise(0.12, { f: 2600, v: 0.1 }); }
   smash() { this.tone(160, 0.22, { to: 55, v: 0.26, type: 'square' }); this.noise(0.2, { f: 420, v: 0.22 }); }
+  swing() { this.noise(0.14, { f: 1100, v: 0.13 }); }
+  jet() { this.noise(0.13, { f: 480, v: 0.11, type: 'lowpass' }); }
+  empty() { this.tone(210, 0.12, { to: 130, v: 0.12, type: 'triangle' }); }
   boss() { this.tone(120, 0.7, { to: 60, v: 0.3, type: 'sawtooth' }); this.noise(0.6, { f: 240, v: 0.2 }); }
   win() { [523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.28, { v: 0.22, type: 'triangle', t0: i * 0.11 })); }
   lose() { [440, 349, 262, 196].forEach((f, i) => this.tone(f, 0.34, { v: 0.24, type: 'sawtooth', t0: i * 0.16 })); }
@@ -199,6 +202,8 @@ export const input = {
   shoot: false,
   jumpHeld: false,
   jumpBuffer: 0, // liten "husk trykket"-tid, gjoer hoppingen snill
+  jet: false,    // jetknappen holdes inne
+  hammerBuffer: 0, // hammerknappen - huskes et lite oeyeblikk, som hoppet
 };
 
 /** Hvor mye roboten skal gaa: styrespaken vinner over tastaturet. */
@@ -216,14 +221,16 @@ function press(act, down) {
     input.jumpHeld = down;
     if (down) input.jumpBuffer = 0.16;
   }
+  else if (act === 'jet') input.jet = down;
+  else if (act === 'hammer') { if (down) input.hammerBuffer = 0.2; }
 }
 
 export function clearInput() {
   keyL = keyR = false;
   input.stickX = input.keyX = 0;
   input.aimMag = 0;
-  input.shoot = input.jumpHeld = false;
-  input.jumpBuffer = 0;
+  input.shoot = input.jumpHeld = input.jet = false;
+  input.jumpBuffer = input.hammerBuffer = 0;
   if (releaseStick) releaseStick();
 }
 
@@ -318,16 +325,19 @@ export function setupInput(root) {
     ArrowRight: 'right', KeyD: 'right',
     Space: 'jump', ArrowUp: 'jump', KeyW: 'jump',
     KeyJ: 'shoot', KeyK: 'shoot', KeyZ: 'shoot', ShiftLeft: 'shoot',
+    KeyE: 'jet', KeyQ: 'hammer',
   };
+  // Skriver du navnet ditt paa rekordlista, er tastene bokstaver - ikke kontroller.
+  const skriver = (e) => e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable);
   window.addEventListener('keydown', (e) => {
     const a = KEYS[e.code];
-    if (!a) return;
+    if (!a || skriver(e)) return;
     e.preventDefault();
     if (!e.repeat) press(a, true);
   });
   window.addEventListener('keyup', (e) => {
     const a = KEYS[e.code];
-    if (!a) return;
+    if (!a || skriver(e)) return;
     e.preventDefault();
     press(a, false);
   });

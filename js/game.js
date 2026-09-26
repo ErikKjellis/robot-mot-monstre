@@ -12,6 +12,13 @@ const GRAV = 2300;
 const ARENA_MIN = 1000;
 const MAX_ACTIVE = 8;
 
+// Kameraet zoomer inn, saa roboten og monstrene blir store paa skjermen.
+// Banen, hoppene og plattformene er de samme - bare utsnittet er mindre.
+const ZOOM = 1.5;
+const ZOOM_SJEF = 1.1;   // minste zoom i sjefkampen, saa baade sjefen og roboten faar plass
+const BAKKEKANT = 60;    // hvor mye bakke som vises under foettene (i verdensenheter)
+const TAK = -40;         // hoeyere enn dette kan ikke roboten fly
+
 /**
  * Ser etter egne PNG-figurer. Bare grunnfilene hentes med en gang -
  * oppgraderings-variantene lastes foerst naar de faktisk kjoepes.
@@ -29,6 +36,7 @@ export class Game {
     this.ctx = canvas.getContext('2d');
     this.W = 960;
     this.H = VIEW_H;
+    this.zoom = ZOOM;
     this.dpr = 1;
     this.t = 0;
     this.run = null;
@@ -52,6 +60,13 @@ export class Game {
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     if (this.world && this.world.locked) this.world.wallX = this.arenaWall(this.world);
   }
+
+  /** Hvor mye av banen som synes, i verdensenheter (skjermen delt paa zoomen). */
+  get viewW() { return this.W / this.zoom; }
+  get viewH() { return this.H / this.zoom; }
+
+  /** Kameraets hoeyde naar roboten staar paa bakken: bakken nederst paa skjermen. */
+  camYHvile() { return GROUND_Y + BAKKEKANT - this.viewH; }
 
   // ---------------------------------------------------------------
   newRun() {
@@ -151,14 +166,16 @@ export class Game {
       }
     }
 
+    this.zoom = ZOOM;
     this.world = {
       i, L, th, len, bossAt, sc,
       platforms, pending, coins, pickups,
       enemies: [], bullets: [], parts: [], texts: [], lasers: [], smashes: [],
-      camX: 0, wallX: 0, locked: false, boss: null,
+      camX: 0, camY: this.camYHvile(), wallX: 0, locked: false, boss: null,
       cleared: false, clearT: 0, gateOpen: false,
       coinsAtStart: this.run.coins,
     };
+    art.lastTema(th);   // egne bakgrunnsbilder for temaet, hvis du har laget noen
 
     const size = this.st.size;
     this.player = {
@@ -166,13 +183,15 @@ export class Game {
       vx: 0, vy: 0, onGround: false, facing: 1,
       coyote: 0, cool: 0, inv: 0, walk: 0, flashShot: 0,
       shieldUp: this.st.hasShield, shieldT: 0, dying: 0,
-      jumpsLeft: 0, laserCool: 1.2, smashCool: 0.6, smashT: 0,
+      laserCool: 1.2, smashCool: 0, smashT: 0,
+      fuel: 1, jetting: false, jetPause: 0, jetLyd: 0, tom: false,
       boostRate: 0, boostStar: 0, aim: 0,
     };
     this.shakeT = 0;
   }
 
-  arenaWall(w) { return Math.max(0, Math.min(w.bossAt, w.len - this.W)); }
+  // Arenaen er like bred som det kameraet ser naar det er zoomet lengst ut.
+  arenaWall(w) { return Math.max(0, Math.min(w.bossAt, w.len - this.W / ZOOM_SJEF)); }
 
   mkCoin(x, y, val) {
     return { x, y, vx: 0, vy: 0, r: 11, seed: Math.random() * 10, val: val || 1, rest: false };
@@ -196,6 +215,7 @@ export class Game {
     if (!w) return;
 
     if (input.jumpBuffer > 0) input.jumpBuffer -= dt;
+    if (input.hammerBuffer > 0) input.hammerBuffer -= dt;
     if (this.shakeT > 0) this.shakeT -= dt;
 
     this.updatePlayer(dt);
@@ -231,6 +251,7 @@ export class Game {
     const w = this.world;
     const st = this.st;
     if (p.dying > 0) {
+      p.jetting = false;
       p.vy += GRAV * dt;
       p.y += p.vy * dt;
       return;
@@ -245,31 +266,57 @@ export class Game {
     else if (target < p.vx) p.vx = Math.max(target, p.vx - accel * dt);
     if (move === 0 && p.onGround) p.vx *= Math.pow(0.0008, dt);
 
-    // hopp - med slingringsmonn, og ekstra hopp i lufta om du har JET
-    if (p.onGround) { p.coyote = 0.13; p.jumpsLeft = st.jumps - 1; } else p.coyote -= dt;
-    if (input.jumpBuffer > 0) {
-      if (p.coyote > 0) {
-        p.vy = -st.jump;
-        p.onGround = false; p.coyote = 0;
-        input.jumpBuffer = 0;
-        sound.jump();
-        this.puff(p.x + p.w / 2, p.y + p.h, 6, '#ffffff');
-      } else if (p.jumpsLeft > 0) {
-        p.jumpsLeft--;
-        p.vy = -st.jump * st.jetPower;
-        input.jumpBuffer = 0;
-        sound.jump();
-        this.ring(p.x + p.w / 2, p.y + p.h, 30, '#ffb347');
-        this.puff(p.x + p.w / 2, p.y + p.h, 8, '#ffb347');
+    // hopp - med litt slingringsmonn rett etter at roboten gikk utfor en kant
+    if (p.onGround) p.coyote = 0.13; else p.coyote -= dt;
+    if (input.jumpBuffer > 0 && p.coyote > 0) {
+      p.vy = -st.jump;
+      p.onGround = false; p.coyote = 0;
+      input.jumpBuffer = 0;
+      sound.jump();
+      this.puff(p.x + p.w / 2, p.y + p.h, 6, '#ffffff');
+      this.effekt('stov', p.x + p.w / 2, p.y + p.h + 2, p.w * 0.45, 0.25, { fra: 0.8, til: 1.2, bunn: true });
+    }
+
+    // --- JETPAKKE: hold jetknappen, saa flyr roboten saa lenge tanken rekker ---
+    // Er tanken tom, maa den fylles til 30 % foer den virker igjen - ogsaa om
+    // knappen holdes inne. Da starter jetpakken av seg selv naar det er nok.
+    p.jetting = false;
+    if (st.jet > 0) {
+      if (input.jet && p.fuel > 0 && !p.tom) {
+        p.jetting = true;
+        // Bare skyv (og bruk drivstoff) naar roboten ikke allerede stiger fortere
+        // enn jetpakken klarer - da bremser den ikke et hopp. Tyngdekraften legges
+        // til etterpaa, saa farten blir den samme uansett bildefrekvens.
+        if (p.vy > -st.jetFart) {
+          p.vy = Math.max(p.vy - (GRAV + st.jetKraft) * dt, -st.jetFart - GRAV * dt);
+          p.fuel = Math.max(0, p.fuel - dt / st.jetTid);
+        }
+        p.onGround = false;
+        p.jetPause = 0.35;               // litt pause foer tanken begynner aa fylles igjen
+        p.jetLyd -= dt;
+        if (p.jetLyd <= 0) { p.jetLyd = 0.11; sound.jet(); }
+        this.jetFlamme(p);
+        if (p.fuel === 0) { p.tom = true; sound.empty(); }
+      } else if (p.jetPause > 0) {
+        p.jetPause -= dt;
+      } else {
+        p.fuel = Math.min(1, p.fuel + st.jetLading * dt);
+        if (p.fuel >= 0.3) p.tom = false;
       }
     }
-    if (!input.jumpHeld && p.vy < -220) p.vy += GRAV * 1.6 * dt;
+
+    if (!input.jumpHeld && !p.jetting && p.vy < -220) p.vy += GRAV * 1.6 * dt;
 
     p.vy += GRAV * dt;
     p.vy = Math.min(p.vy, 1400);
     p.x += p.vx * dt;
     p.y += p.vy * dt;
+    if (p.y < TAK) { p.y = TAK; if (p.vy < 0) p.vy = 0; }
+    const iLufta = !p.onGround, fallFart = p.vy;
     this.collide(p);
+    if (iLufta && p.onGround && fallFart > 420 && p.dying <= 0) {
+      this.effekt('stov', p.x + p.w / 2, p.y + p.h + 2, p.w * 0.6, 0.3, { fra: 0.7, til: 1.3, bunn: true });
+    }
 
     const minX = w.locked ? w.wallX + 4 : 0;
     p.x = clamp(p.x, minX, w.len - p.w - 4);
@@ -324,11 +371,12 @@ export class Game {
       if (p.laserCool <= 0 && this.fireLaser()) p.laserCool = st.laserEvery;
     }
 
-    // --- HAMMER: smeller paa alt som kommer for naerme ---
+    // --- HAMMER: slaar naar du trykker paa hammerknappen ---
     p.smashT = Math.max(0, p.smashT - dt);
-    if (st.hammer > 0) {
-      p.smashCool -= dt;
-      if (p.smashCool <= 0) this.trySmash();
+    p.smashCool = Math.max(0, p.smashCool - dt);
+    if (st.hammer > 0 && input.hammerBuffer > 0 && p.smashCool <= 0) {
+      input.hammerBuffer = 0;
+      this.smash();
     }
 
     if (st.hasShield && !p.shieldUp) {
@@ -347,6 +395,7 @@ export class Game {
     const cx = p.x + p.w / 2, cy = p.y + p.h * 0.42;
     let best = null, bd = Infinity;
     for (const e of this.world.enemies) {
+      if (!this.synlig(e)) continue;        // ikke skyt paa noe du ikke ser
       const dx = (e.x + e.w / 2) - cx;
       // ikke snu seg etter noe langt bak, men ta med det som er rett over
       if (Math.abs(dx) > 130 && Math.sign(dx) !== p.facing) continue;
@@ -361,6 +410,7 @@ export class Game {
     const ex = p.x + p.w / 2, ey = p.y + p.h * 0.16;
     let best = null, bd = 1e9;
     for (const e of w.enemies) {
+      if (!this.synlig(e)) continue;
       const d = Math.hypot(e.x + e.w / 2 - ex, e.y + e.h / 2 - ey);
       if (d < 620 && d < bd) { bd = d; best = e; }
     }
@@ -379,7 +429,8 @@ export class Game {
     return true;
   }
 
-  trySmash() {
+  /** Hammerslag. Svinger alltid, men smeller bare hvis noe er naer nok. */
+  smash() {
     const p = this.player, w = this.world, st = this.st;
     const cx = p.x + p.w / 2, cy = p.y + p.h * 0.55;
     const R = st.hammerRange + p.w * 0.5;
@@ -392,12 +443,28 @@ export class Game {
         hit = true;
       }
     }
-    if (!hit) return;
-    p.smashCool = st.hammerEvery;
+    // Bommer du, er hammeren klar igjen nesten med en gang - bare et treff koster ventetid.
+    p.smashCool = hit ? st.hammerEvery : 0.25;
     p.smashT = 0.28;
-    w.smashes.push({ x: cx + p.facing * R * 0.4, y: cy, r: R, life: 0.25, max: 0.25 });
-    this.shake(0.14, 6);
-    sound.smash();
+    // Smellet med stein og gnister vises bare naar hammeren treffer; en bom er bare et sveip.
+    w.smashes.push({ x: cx + p.facing * R * 0.4, y: cy, r: R, life: 0.25, max: 0.25, niva: st.hammer, retning: p.facing, bom: !hit });
+    if (hit) { this.shake(0.14, 6); sound.smash(); } else sound.swing();
+  }
+
+  /** Flammer ut av jetpakken. Den sitter der riggen sier ryggdelen er. */
+  jetFlamme(p) {
+    // blaa gnister naar jetpakken har sine egne (blaa) flammer, ellers oransje
+    const blaa = sprites.harTilstand(ROBOT_RIG, 'rygg', this.run.up, 'flamme');
+    const dys = sprites.dysePunkt(ROBOT_RIG, p.h);
+    const x = p.x + p.w / 2 + dys.x * p.facing;
+    const y = p.y + p.h + dys.y;
+    for (let i = 0; i < 2; i++) {
+      this.world.parts.push({
+        x: x + rand(-4, 4), y, vx: rand(-40, 40) - p.vx * 0.2, vy: rand(160, 320),
+        r: rand(4, 8), life: rand(0.16, 0.3), max: 0.3,
+        color: blaa ? (chance(0.5) ? '#5ee6ff' : '#d8fbff') : (chance(0.5) ? '#ffb347' : '#ffe066'),
+      });
+    }
   }
 
   collide(e) {
@@ -454,7 +521,7 @@ export class Game {
   // --- monstre ---
   spawnPending() {
     const w = this.world;
-    const edge = w.camX + this.W + 90;
+    const edge = w.camX + this.viewW + 90;
     while (w.pending.length && w.pending[0].x < edge) {
       if (w.enemies.length >= MAX_ACTIVE) break;
       const s = w.pending.shift();
@@ -543,10 +610,21 @@ export class Game {
     }
   }
 
+  /** Er monsteret paa skjermen? Kameraet er zoomet inn, saa det er ikke sikkert. */
+  synlig(e) {
+    const w = this.world;
+    return e.x + e.w > w.camX + 10 && e.x < w.camX + this.viewW - 10 &&
+      e.y + e.h > w.camY + 10 && e.y < w.camY + this.viewH - 10;
+  }
+
   mobAI(e, dt, dir, pcx, pcy) {
     const d = e.def;
     const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
     const dist = Math.abs(pcx - ecx);
+    // Ingen skudd fra monstre du ikke ser: de venter litt etter at de kommer inn
+    // paa skjermen, og de som vil holde avstand gaar inn til de synes foerst.
+    const synlig = this.synlig(e);
+    if (d.shotEvery && !synlig) e.timer = Math.max(e.timer, 0.5);
 
     if (d.ai === 'walk') {
       e.vx = dir * d.sp;
@@ -560,7 +638,7 @@ export class Game {
         }
       }
     } else if (d.ai === 'fly') {
-      const ty = pcy - 60 + Math.sin(this.t * 2.2 + e.seed) * 60;
+      const ty = Math.max(TAK + e.h / 2, pcy - 60 + Math.sin(this.t * 2.2 + e.seed) * 60);
       e.vx = dir * d.sp;
       e.vy = clamp((ty - ecy) * 2.4, -170, 170);
       // drager spytter ild
@@ -570,13 +648,15 @@ export class Game {
       }
     } else if (d.ai === 'shoot') {
       const want = 320;
-      e.vx = dist > want + 60 ? dir * d.sp : dist < want - 60 ? -dir * d.sp : e.vx * 0.9;
+      if (!synlig) e.vx = dir * d.sp;
+      else e.vx = dist > want + 60 ? dir * d.sp : dist < want - 60 ? -dir * d.sp : e.vx * 0.9;
       if (e.timer <= 0 && dist < 620) {
         e.timer = d.shotEvery;
         this.enemyShot(ecx, ecy - e.h * 0.2, pcx, pcy, d.shotSpeed, d.shotColor, d.skudd);
       }
     } else if (d.ai === 'cast') {
-      e.vx = dist > 420 ? dir * d.sp : dist < 260 ? -dir * d.sp * 0.7 : 0;
+      if (!synlig) e.vx = dir * d.sp;
+      else e.vx = dist > 420 ? dir * d.sp : dist < 260 ? -dir * d.sp * 0.7 : 0;
       if (e.timer <= 0 && dist < 700) {
         e.timer = d.shotEvery;
         const b = this.enemyShot(ecx, ecy - e.h * 0.3, pcx, pcy, d.shotSpeed, d.shotColor, d.skudd);
@@ -740,6 +820,7 @@ export class Game {
     e.hp -= dmg;
     e.hurtT = 0.16;
     this.puff(x, y, 4, '#ffe6a0');
+    this.effekt('treff', x, y, 18, 0.18, { fra: 0.6, til: 1.1, rot: rand(0, TAU) });
     if (e.hp > 0) sound.hit();
   }
 
@@ -750,6 +831,8 @@ export class Game {
     sound.kill();
     this.puff(cx, cy, e.boss ? 40 : 12, e.def.body);
     this.ring(cx, cy, e.boss ? 160 : 46, e.def.body);
+    this.effekt('poff', cx, cy, Math.max(e.w, e.h) * (e.boss ? 0.6 : 0.75), 0.45,
+      { fra: 0.7, til: 1.35, speil: chance(0.5) });
 
     let n = e.boss ? e.def.coins : randInt(e.def.coins[0], e.def.coins[1]);
     if (!e.boss) n = Math.max(1, Math.round(n * w.sc.coin));
@@ -806,7 +889,7 @@ export class Game {
       b.y += b.vy * dt;
 
       const box = { x: b.x - b.r, y: b.y - b.r, w: b.r * 2, h: b.r * 2 };
-      let gone = b.life <= 0 || b.x < w.camX - 120 || b.x > w.camX + this.W + 120 || b.y > VIEW_H + 60 || b.y < -80;
+      let gone = b.life <= 0 || b.x < w.camX - 120 || b.x > w.camX + this.viewW + 120 || b.y > VIEW_H + 60 || b.y < TAK - 120;
 
       if (!gone && b.friendly) {
         for (const e of w.enemies) {
@@ -913,6 +996,18 @@ export class Game {
     }
   }
 
+  /**
+   * Effekt med eget bilde (art/effekter/<navn>.png). Uten bildet skjer ingenting -
+   * da er det de vanlige prikkene og ringene som synes.
+   */
+  effekt(navn, x, y, r, life, o = {}) {
+    if (!art.effektBilde(navn)) return;
+    this.world.parts.push({
+      kind: 'bilde', navn, x, y, vx: 0, vy: 0, r, life, max: life,
+      fra: o.fra ?? 1, til: o.til ?? 1, rot: o.rot || 0, speil: !!o.speil, bunn: !!o.bunn,
+    });
+  }
+
   ring(x, y, r, color) {
     this.world.parts.push({ x, y, vx: 0, vy: 0, r, life: 0.4, max: 0.4, color, kind: 'ring' });
   }
@@ -927,7 +1022,7 @@ export class Game {
     for (let i = w.parts.length - 1; i >= 0; i--) {
       const p = w.parts[i];
       p.life -= dt;
-      if (p.kind !== 'ring') {
+      if (p.kind !== 'ring' && p.kind !== 'bilde') {
         p.vy += GRAV * 0.4 * dt;
         p.x += p.vx * dt;
         p.y += p.vy * dt;
@@ -946,11 +1041,45 @@ export class Game {
   updateCamera(dt) {
     const w = this.world;
     const p = this.player;
-    const maxX = Math.max(0, w.len - this.W);
-    let target = w.locked ? w.wallX : p.x + p.w / 2 - this.W * 0.40;
-    target = clamp(target, 0, maxX);
-    w.camX += (target - w.camX) * Math.min(1, dt * 7);
-    if (w.locked) w.camX = target;
+    const sjef = w.locked && w.boss;
+
+    // Zoom: tett paa i banen. I sjefkampen zoomer den ut akkurat nok til at
+    // baade sjefen og roboten er med.
+    let zoomMaal = ZOOM;
+    if (sjef) {
+      const b = w.boss;
+      const hoyde = GROUND_Y + BAKKEKANT - (Math.min(b.y, p.y) - 40);
+      const bredde = Math.abs((b.x + b.w / 2) - (p.x + p.w / 2)) + b.w / 2 + p.w / 2 + 160;
+      zoomMaal = clamp(Math.min(this.H / hoyde, this.W / bredde), ZOOM_SJEF, ZOOM);
+    }
+    this.zoom += (zoomMaal - this.zoom) * Math.min(1, dt * 2.5);
+    const viewW = this.viewW, viewH = this.viewH;
+
+    // sideveis: roboten godt til venstre, saa man ser det som kommer.
+    // I sjefkampen: midt mellom roboten og sjefen - men aldri saa roboten faller ut.
+    let tx = p.x + p.w / 2 - viewW * (w.locked ? 0.5 : 0.3);
+    if (sjef) {
+      tx = ((w.boss.x + w.boss.w / 2) + (p.x + p.w / 2)) / 2 - viewW / 2;
+      tx = clamp(tx, p.x + p.w + 40 - viewW, p.x - 40);
+    }
+    const minX = w.locked ? w.wallX : 0;
+    tx = clamp(tx, minX, Math.max(minX, w.len - viewW));
+    w.camX += (tx - w.camX) * Math.min(1, dt * 7);
+
+    // i hoeyden: bakken nederst, men kameraet foelger med naar roboten klatrer
+    // eller flyr hoeyt (og ser litt foran seg naar den faller ned igjen).
+    // I sjefkampen er bakken alltid med, saa man ser sjokkboelgene komme.
+    const hvile = this.camYHvile();
+    let ty = Math.min(hvile, p.y + Math.max(0, p.vy) * 0.12 - viewH * 0.28);
+    if (sjef) ty = Math.max(Math.min(w.boss.y, p.y) - 40, GROUND_Y + 25 - viewH);
+    ty = clamp(ty, TAK - 40, hvile);
+    w.camY += (ty - w.camY) * Math.min(1, dt * 5);
+  }
+
+  /** Naar spillet stopper (pause, seier, tap): ingen flamme eller risting som henger igjen. */
+  stopp() {
+    this.shakeT = 0;
+    if (this.player) this.player.jetting = false;
   }
 
   // ---------------------------------------------------------------
@@ -962,8 +1091,9 @@ export class Game {
     const W = this.W, H = this.H;
     if (!w) { ctx.fillStyle = '#0b1020'; ctx.fillRect(0, 0, W, H); return; }
     const th = w.th;
-    art.drawBackground(ctx, th, w.camX, W, H, this.t);
-    art.drawGround(ctx, th, w.camX, W, H, GROUND_Y);
+    const z = this.zoom;
+    // Himmel og bakgrunnslag tegnes i skjermkoordinater, alt annet i banen.
+    art.drawBackground(ctx, th, w.camX, w.camY, z, W, H, this.t, GROUND_Y);
 
     let sx = 0, sy = 0;
     if (this.shakeT > 0) {
@@ -972,22 +1102,25 @@ export class Game {
     }
 
     ctx.save();
-    ctx.translate(-w.camX + sx, sy);
+    ctx.scale(z, z);
+    ctx.translate(-w.camX + sx, -w.camY + sy);
+    art.drawGround(ctx, th, w.camX, w.camY, this.viewW, this.viewH, GROUND_Y);
 
+    const venstre = w.camX, hoyre = w.camX + this.viewW;
     for (const p of w.platforms) {
-      if (p.x + p.w < w.camX - 60 || p.x > w.camX + W + 60) continue;
-      art.drawPlatform(ctx, p, th, 0);
+      if (p.x + p.w < venstre - 60 || p.x > hoyre + 60) continue;
+      art.drawPlatform(ctx, p, th);
     }
     art.drawGate(ctx, (w.locked ? w.wallX : w.bossAt) + 26, GROUND_Y, th, this.t, w.gateOpen);
 
     for (const c of w.coins) {
-      if (c.x < w.camX - 40 || c.x > w.camX + W + 40) continue;
+      if (c.x < venstre - 40 || c.x > hoyre + 40) continue;
       art.drawCoin(ctx, c, this.t);
     }
     for (const h of w.pickups) art.drawPowerup(ctx, h, this.t);
 
     for (const e of w.enemies) {
-      if (e.x + e.w < w.camX - 160 || e.x > w.camX + W + 160) continue;
+      if (e.x + e.w < venstre - 160 || e.x > hoyre + 160) continue;
       this.drawEnemy(ctx, e);
     }
 
@@ -1037,6 +1170,11 @@ export class Game {
       ctx.stroke();
       ctx.restore();
     }
+    // Har jetpakken sitt eget bilde med flammer, tegnes det av riggen (se tilstand under).
+    if (p.jetting && p.dying <= 0 && !sprites.harTilstand(ROBOT_RIG, 'rygg', this.run.up, 'flamme')) {
+      const dys = sprites.dysePunkt(ROBOT_RIG, p.h);
+      art.drawJetFlame(ctx, p.x + p.w / 2 + dys.x * p.facing, p.y + p.h + dys.y, p.h * 0.24, this.t);
+    }
     if (p.inv > 0 && Math.floor(p.inv * 14) % 2 === 0) return;
     ctx.save();
     if (p.dying > 0) {
@@ -1060,6 +1198,7 @@ export class Game {
       aim: localAim, recoil: p.flashShot, smash: p.smashT / 0.28,
       flash: p.inv > 0.9,
       variants: this.run.up,
+      tilstand: p.jetting && p.dying <= 0 ? { rygg: 'flamme' } : null,
     };
     if (!sprites.drawRig(ctx, ROBOT_RIG, s)) {
       art.drawRobot(ctx, s.x, s.y, p.h, {
@@ -1089,8 +1228,16 @@ export class Game {
     if (p && p.boostStar > 0) {
       boosts.push({ key: 'star', ico: POWERUPS.star.ico, left: p.boostStar, frac: p.boostStar / POWERUPS.star.time });
     }
+    const st = this.st;
     return {
       boosts,
+      // knappene for jetpakke og hammer vises bare naar de er kjoept
+      jet: !!(st && st.jet > 0),
+      fuel: p ? p.fuel : 1,
+      jetting: !!(p && p.jetting),
+      jetTom: !!(p && p.tom),
+      hammer: !!(st && st.hammer > 0),
+      hammerKlar: p && st && st.hammer > 0 ? 1 - clamp(p.smashCool / st.hammerEvery, 0, 1) : 1,
       hp: this.run ? this.run.hp : 0,
       maxHp: this.st ? this.st.maxHp : 100,
       coins: this.run ? this.run.coins : 0,

@@ -2,6 +2,8 @@
 
 import { sound, setupInput, setupStick, clearInput, store, pick } from './core.js';
 import { LEVELS } from './content.js';
+import { settTekst, skrivOm } from './skrift.js';
+import { rammeRundt } from './ramme.js';
 import { Game, preloadFigures } from './game.js';
 import {
   el, showScreen, showLayer, updateHud, resetHudCache,
@@ -26,6 +28,7 @@ let lastScoreIdx = -1;
 function setState(s) {
   state = s;
   clearInput();
+  if (s !== 'play') game.stopp();
   showScreen(s === 'play' ? null : 'scr' + s[0].toUpperCase() + s.slice(1));
   const playing = s === 'play';
   showLayer('hud', playing || s === 'pause');
@@ -58,8 +61,8 @@ function goPlay() {
 game.onEvent = (kind) => {
   if (kind === 'cleared') {
     const earned = game.run.coins - game.world.coinsAtStart;
-    el('winCoins').textContent = earned;
-    el('winTitle').textContent = pick(['BRA!', 'SUPER!', 'WOW!', 'TOPP!']);
+    settTekst(el('winCoins'), earned);
+    settTekst(el('winTitle'), pick(['BRA!', 'SUPER!', 'WOW!', 'TOPP!']));
     sound.stopMusic();
     if (game.run.level >= LEVELS.length - 1) {
       showEnd(true);
@@ -73,8 +76,11 @@ game.onEvent = (kind) => {
 
 function showEnd(won) {
   el('overEmoji').textContent = won ? '\u{1F3C6}' : '\u{1F480}';
-  el('overTitle').textContent = won ? 'DU VANT!' : 'AU!';
-  el('overWorth').textContent = game.worth;
+  // vant: pokal-emojien (ingen bilde ennaa), tapte: hodeskallen fra art/grafikk
+  el('overEmoji').classList.toggle('hodeskalle', !won);
+  el('overEmoji').classList.toggle('bildeikon', !won);
+  settTekst(el('overTitle'), won ? 'DU VANT!' : 'AU!');
+  settTekst(el('overWorth'), game.worth);
   el('nameInput').value = store.get('rvm.name', 'ROBO');
   scoreSaved = false;
   sound.stopMusic();
@@ -98,6 +104,19 @@ function commitScore() {
 // ---------------------------------------------------------------
 //  KNAPPER
 // ---------------------------------------------------------------
+// Egne knappebilder og ikoner (art/grafikk/) brukes bare hvis ALLE finnes -
+// ellers ville en knapp uten bilde blitt usynlig. Listen er de samme bildene
+// som css/style.css bruker under .knappebilder.
+const KNAPPEBILDER = ['spill', 'spill-trykk', 'highscore', 'highscore-trykk', 'lyd', 'lyd-trykk',
+  'lyd-av', 'fullskjerm', 'fullskjerm-trykk', 'fortsett', 'fortsett-trykk', 'hjem', 'hjem-trykk',
+  'igjen', 'pause'].map((n) => 'art/grafikk/knapp-' + n + '.png')
+  .concat(['art/grafikk/ikon-stjerne.png', 'art/grafikk/ikon-hodeskalle.png']);
+Promise.all(KNAPPEBILDER.map((src) => new Promise((ok, feil) => {
+  const i = new Image();
+  i.onload = ok; i.onerror = feil;
+  i.src = src;
+}))).then(() => document.documentElement.classList.add('knappebilder'), () => {});
+
 el('btnPlay').addEventListener('click', () => { sound.unlock(); startRun(); });
 el('btnScores').addEventListener('click', () => { lastScoreIdx = -1; setState('scores'); });
 el('btnScoresBack').addEventListener('click', () => setState('title'));
@@ -147,6 +166,10 @@ window.addEventListener('pointerdown', () => sound.unlock(), { once: true });
 setupInput(document);
 setupStick(el('stickZone'), el('stick'), el('stickKnob'));
 setSoundIcons();
+// overskrifter og knappetekst med data-tekst faar bildefonten
+skrivOm();
+// vinduene (pause, vunnet, tapt, poeng) faar rammen bygd av delene i art/grafikk/ramme/
+document.querySelectorAll('.panel').forEach(rammeRundt);
 preloadFigures();   // ser etter egne PNG-figurer i art/-mappa
 
 function fit() {

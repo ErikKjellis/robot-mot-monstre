@@ -12,6 +12,10 @@ Kjør `node serve.js`, og åpne:
 |---|---|
 | **`verktoy/rigger.html`** | **Riggverkstedet.** Dra hver kroppsdel på plass, sett leddene, roter, speilvend. Lagrer `rigg.json`. Det er her du bygger figuren. |
 | `verktoy/figurtest.html` | Viser figuren stor og i bevegelse, og lister hvilke filer som ble funnet |
+| `verktoy/banetest.html` | Viser bakgrunnen, bakken, plattformene, tingene og effektene for hvert tema slik de blir i spillet, og lister hvilke bilder som ble funnet |
+| `verktoy/lag-ramme.js` | Deler et ark med ni rammedeler opp i biter spillet bygger rammer av — se **Rammene** |
+| `verktoy/lag-font.js` | Lager bildefonten av et ark med tegnede bokstaver — se **Skrift og knapper** |
+| `verktoy/somlos.js` | Gjør et bakgrunnsbilde klart til å gjentas bortover uten synlig søm. `node verktoy/somlos.js --lag art/bane/skog/midt.png` (fjerner også hvitt og tom plass over og under), `--bakke` for `bakke.png` (legger bakkekanten en tolvdel ned), eller uten noe for `himmel.png`. |
 | `verktoy/lag-startrigg.js` | Lager en `rigg.json` å starte med: finner leddene i bildene selv og setter figuren sammen. `node verktoy/lag-startrigg.js art/monstre/<navn> <kroppstype>` (tobeint, flygende, firbeint eller klump). Finjuster etterpå i riggverkstedet. |
 | `verktoy/sjekk-del.js` | Sjekker bilder av kroppsdeler før du bruker dem: hvit bakgrunn, én bit, ingenting kuttet av kanten, bleke kanter uten strek, og om delene har samme farger. `node verktoy/sjekk-del.js <mappe>` |
 
@@ -60,6 +64,12 @@ Tegn hver kroppsdel som sitt eget bilde — hodet i ett bilde, armen i et annet.
 bildet. Så åpner du `verktoy/rigger.html`, drar delene på plass, setter leddene,
 og trykker **Last ned rigg.json**. Legg fila i figurens mappe. Ferdig — spillet
 bruker den med en gang, uten at du rører koden.
+
+**Føttene havner på bakken av seg selv.** Spillet finner figurens laveste synlige
+punkt når den står stille, og setter det akkurat på bakken — så en figur kan ikke
+sveve eller synke ned, selv om delene er plassert litt for høyt eller lavt i
+riggverkstedet. Vil du heller styre høyden selv, skriv `"fotJustering": false`
+i `rigg.json`.
 
 > **Lager du bildene med en bilde-AI?** Bruk [AI-OPPSKRIFT.md](AI-OPPSKRIFT.md).
 > Den er skrevet for å limes rett inn til AI-en, og tar med det som pleier å gå
@@ -224,12 +234,14 @@ kan bytte ut en kroppsdel.**
 
 | Oppgradering | Bytter ut | Filnavn |
 |---|---|---|
+| 🔫 KANON | `vapen` (kanonen i hånda) | `vapen-kanon1.png` … `-kanon5.png` |
 | 🔫 KANON | `arm-fram` | `arm-fram-kanon1.png` … `-kanon5.png` |
 | 👁️ LASER | `hode` | `hode-laser1.png` … `-laser5.png` |
+| 🔨 HAMMER | `hammer` (hammeren i hånda) | `hammer-hammer1.png` … `-hammer5.png` |
 | 🔨 HAMMER | `arm-bak` | `arm-bak-hammer1.png` … `-hammer5.png` |
 | 🦿 BEIN | `bein-fram`, `bein-bak` | `bein-fram-bein1.png` … |
 | 🛡️ PANSER | `kropp` | `kropp-panser1.png` … `-panser5.png` |
-| 🚀 JET | `rygg` | `rygg-jet1.png` … `-jet5.png` |
+| 🚀 JET | `rygg` | `rygg-jet1.png` … `-jet5.png`, og `rygg-jet1-flamme.png` … med flammer |
 
 Har du kjøpt kanon nivå 3, leter spillet etter `arm-fram-kanon3.png`, så
 `-kanon2`, så `-kanon1`, og til slutt `arm-fram.png`. **Du trenger altså ikke
@@ -248,8 +260,164 @@ Roboten blir dessuten større for hver eneste oppgradering, fra 50 til 119
 piksler høy. Tegn den derfor som den ser ut **ferdig utbygd** — den skaleres ned
 når den er liten.
 
+**Jetpakken med flammer:** lag `rygg-jet3-flamme.png` ved siden av
+`rygg-jet3.png`, så brukes den mens roboten flyr (og spillet tegner ingen egen
+flamme). Tegn begge på **nøyaktig samme lerret** — samme størrelse og pakken på
+samme sted — så ligger de oppå hverandre.
+
+**Samme lerret for alle nivåene:** alle fem kanonene (og hamrene, og
+jetpakkene) plasseres med de samme tallene i riggen. Legg dem derfor på like
+store lerreter, med håndtaket (eller midten av pakken) på samme sted — da blir de
+store nivåene større på roboten, og ingenting hopper når du kjøper et nytt nivå.
+
+**Skudd og hammersmell per nivå:** `art/ting/skudd-1.png` … `-5.png` er
+skuddene fra hver kanon, og `art/effekter/slag-1.png` … `-5.png` smellet fra
+hver hammer (se under).
+
 I figurtesteren kan du dra i skyvebryterne for hver oppgradering og se
 roboten bygge seg om med en gang.
+
+---
+
+## Bakgrunner, bakke, ting og effekter
+
+Alt i banen kan også byttes ut — himmelen, fjellene i bakgrunnen, bakken,
+plattformene, mynter, kraftpakker, skudd og effektene (smell, flammer, støv). Samme regel som for figurene:
+**finnes fila, brukes den, ellers tegner spillet selv.** Se resultatet i
+`verktoy/banetest.html` mens du jobber.
+
+### Banen — `art/bane/<tema>/`
+
+Hvert nivå har sitt tema: `by` (nivå 1), `skog` (2), `hule` (3), `is` (4),
+`lava` (5) og `rom` (6). Eksempel: `art/bane/skog/himmel.png`.
+
+| Fil | Hva det er | Slik brukes den |
+|---|---|---|
+| `himmel.png` | himmelen | Fyller hele skjermen i høyden og gjentas bortover. Glir nesten ikke. Helt dekkende bilde, liggende format (f.eks. 1536 × 1024). |
+| `sol.png` | sola, månen eller planeten (valgfri) | Tegnes én gang, oppe til høyre, 22 % av skjermhøyden, og glir nesten ikke. Tegn den **ikke** inn i `himmel.png` — himmelen gjentas bortover, og da kunne du sett to soler samtidig. Tegn den på hvit bakgrunn med en litt mørkere kant, så beskjæres den av seg selv. Uten `sol.png` får en egen himmel ingen sol; uten egen himmel tegner spillet sin egen. |
+| `langt.png` | fjell eller byer langt borte | Hele bildet blir 55 % av skjermhøyden, med bunnkanten på horisonten. Gjentas bortover og glir sakte forbi. |
+| `midt.png` | trær eller hus nærmere | Som `langt`, men 40 % av skjermhøyden, og glir raskere. |
+| `naer.png` | busker og steiner rett bak banen (valgfri) | 25 % av skjermhøyden, glir nesten like fort som bakken. |
+| `bakke.png` | bakken | Gjentas bortover. **Bakkekanten der figurene står skal ligge en tolvdel ned i bildet** — det over kanten stikker opp over bakken. La gresset gå helt opp til toppkanten, eller gjør mellomrommene mellom gresstråene ekte gjennomsiktige: hvitt fjernes ikke fra `bakke.png`. Bare omtrent de øverste 60 % synes, så legg detaljene øverst. Gjerne kvadratisk, f.eks. 512 × 512. |
+| `plattform.png` | plattformene | **Øverste kant er der figurene står.** Minst tre ganger så bred som høy, f.eks. 768 × 256. Endene (et kvadrat hver) blir stående, midten strekkes til plattformens bredde. |
+| `port.png` | porten foran sjefen | Tegnes 250 enheter høy, og bredden følger bildet. Vil du ha en smal port som den innebygde, tegn den omtrent fem ganger så høy som bred (f.eks. 256 × 1280). |
+
+**Bilder som gjentas bortover må henge sammen i kantene** — det som går ut på
+høyre side må fortsette på venstre side, ellers ser du en søm. Klarer du ikke
+det selv, gjør `node verktoy/somlos.js` det for deg: den skjærer en snirklete
+søm der de to endene ligner mest, og bildet blir en femtedel smalere.
+
+**Hvit bakgrunn på `langt`, `midt` og `naer`:** tegn dem på hvit bakgrunn,
+så fjernes det hvite rundt fjellene og trærne automatisk. Men alt som er hvitt
+eller veldig lyst grått og henger sammen med kanten av bildet, tas for
+bakgrunn — gi snø, is og dis en tydelig mørk strek. Har bildet allerede ekte
+gjennomsiktighet, røres det ikke. Disse bildene krympes og beskjæres aldri.
+`himmel.png` og `bakke.png` røres ikke av oppryddingen i det hele tatt.
+
+**Bare din egen himmel?** Så lenge `langt.png` og `midt.png` mangler, tegner
+spillet sine egne fjell og trær foran den. Vil du bare se himmelen din, legg
+inn en helt gjennomsiktig `langt.png` og `midt.png`.
+
+### Ting — `art/ting/`
+
+| Fil | Hva det er |
+|---|---|
+| `mynt.png` | mynten — den snurrer av seg selv |
+| `hjerte.png` | kraftpakken som gir helse |
+| `lyn.png` | kraftpakken som gir dobbel skuddfart |
+| `stjerne.png` | kraftpakken som gjør roboten usårbar |
+| `skudd-1.png` … `skudd-5.png` | robotens skudd for hvert kanonnivå. Tegn dem **pekende mot høyre**. Mangler et nivå, brukes nivået under. `skudd-1` brukes også før du har kjøpt KANON. |
+| `fiendeskudd.png` | monstrenes skudd, også pekende mot høyre — brukes for alle skudd som ikke har sitt eget bilde i `art/effekter/` |
+
+Tingene ryddes som figurene: hvit bakgrunn fjernes, små løse prikker fjernes, og de krympes til maks 512 piksler. Tegn hver ting som én sammenhengende figur.
+
+### Effekter — `art/effekter/`
+
+| Fil | Hva det er | Slik brukes den |
+|---|---|---|
+| `ildkule.png` | ildkula fra de flygende dragene og Røddragen | Pekende mot høyre, snus i fartsretningen |
+| `iskule.png` | isspyttet fra isøglene og Frostdragens kuler | som over |
+| `magikule.png` | magien fra skyggedragene (den som svinger etter deg) | som over |
+| `giftkule.png` | Hydraens vifte av skudd | som over |
+| `kongekule.png` | Kongedragens skudd | som over |
+| `sjokkbolge.png` | bølgen som ruller langs bakken når en sjef stamper | Tegnet mot høyre (speilvendes når den ruller mot venstre), med flat bunn — bunnen står på bakken |
+| `poff.png` | røyksky når et monster blir beseiret | Vokser og blekner over monsteret; brukes for alle monstre, så hold fargen nøytral |
+| `treff.png` | lite smell der et skudd treffer | Snus tilfeldig |
+| `slag.png` | smellet når hammeren treffer | Vokser og blekner foran roboten, med bunnen litt under midten av den. Lag gjerne `slag-1.png` … `slag-5.png`, ett for hvert hammernivå |
+| `jetflamme.png` | flammen fra jetpakken | **Spissen rett nedover**, bred ende øverst. Lengden flakker. Brukes ikke når jetpakken har sitt eget `rygg-jetN-flamme.png` |
+| `stov.png` | støvsky ved føttene når roboten hopper og lander | Bunnen står på bakken |
+
+Effektene ryddes som tingene, men små løse biter beholdes — et smell kan godt
+være flere stråler. Gi alt en tydelig mørk strek rundt, ellers kan lyse flammer
+og skyer bli spist opp sammen med den hvite bakgrunnen. Uten bildet tegner
+spillet effekten som før.
+
+---
+
+## Skrift og knapper
+
+### Bildefonten — `art/font/`
+
+Tekstene i spillet (tall, overskrifter, butikken, poengene, "+5" når du tar en
+mynt) tegnes med en **bildefont**: hver bokstav er et lite utsnitt av
+`art/font/spillfont.png`, og `spillfont.json` sier hvor hver bokstav ligger.
+Det er det samme som BitmapText i Phaser — `spillfont.xml` er i BMFont-formatet
+Phaser leser, hvis du vil bruke fonten der også.
+
+Vil du tegne bokstavene på nytt: tegn dem i rader på gjennomsiktig (eller hvit)
+bakgrunn, godt adskilt, og kjør
+
+```bash
+node verktoy/lag-font.js ark/font-kilde.png spillfont "ABCDEFGHIJKLM" "NOPQRSTUVWXYZ" "ÆØÅ" "abcdefghijklm" "nopqrstuvwxyz" "æøå" "0123456789!?.,-" --som "I=l"
+```
+
+Hver rad i anførselstegn er tegnene i den raden på arket, fra venstre. Se
+`art/font/spillfont-oversikt.png` etterpå — hver bokstav skal stå på den røde
+grunnlinja. `--som "I=l"` betyr at stor I bruker formen til liten l (på arket
+er stor I tegnet med prikk, som en liten i). Tegn som mangler (som + og emoji)
+skrives med vanlig tekst.
+
+`Spillfont.ttf` brukes bare i navnefeltet på slutten, der bildefont ikke går.
+
+### Knapper og ikoner — `art/grafikk/`
+
+| Fil | Hvor |
+|---|---|
+| `logo.png` | startskjermen |
+| `knapp-spill.png`, `knapp-highscore.png`, `knapp-lyd.png`, `knapp-fullskjerm.png` | startskjermen (`-trykk` når de trykkes, `knapp-lyd-av.png` når lyden er av) |
+| `knapp-fortsett.png` | fortsett-knappen i pausen |
+| `knapp-hjem.png` | hjem-knappene (pause og poenglista) |
+| `knapp-pause.png` | pauseknappen oppe til høyre |
+| `knapp-igjen.png` | spill igjen, når du har tapt |
+| `ikon-stjerne.png`, `ikon-hodeskalle.png` | når du vinner et nivå / taper |
+| `ramme/` | rammen rundt vinduene (pause, vunnet, tapt, poeng) — se under |
+
+### Rammene — `art/grafikk/ramme/`
+
+Rammene rundt vinduene **bygges av ni deler**, akkurat som du tegnet dem — ingenting
+strekkes. Hjørnene settes i hjørnene, kantene legges som hele planker (så mange som
+får plass, hver planke justeres bare litt så den siste slutter ved hjørnet), og
+midten legges som fliser. Da blir rammen like fin enten vinduet er lite eller stort.
+
+| Fil | Del |
+|---|---|
+| `hjorne-oppe-venstre.png`, `hjorne-oppe-hoyre.png`, `hjorne-nede-venstre.png`, `hjorne-nede-hoyre.png` | hjørnene (gresset og steinene som stikker ut, blir med) |
+| `kant-oppe.png`, `kant-nede.png`, `kant-venstre.png`, `kant-hoyre.png` | plankene langs kantene |
+| `midt.png` | flisa i midten |
+| `ramme.json` | hvor **steinen** er i hvert bilde (gress og småstein teller ikke) |
+
+Tegner du et nytt sett, legg de ni delene i et rutenett på ett ark (hjørne, kant,
+hjørne / kant, midt, kant / hjørne, kant, hjørne) og kjør
+
+```bash
+node verktoy/lag-ramme.js art/grafikk/panel-deler.png
+```
+
+I koden: `tegnRamme(ctx, x, y, bredde, hoyde, skala)` i `js/ramme.js` tegner en ramme
+hvor som helst i et lerret, og `rammeRundt(element)` gir et vindu i menyene en ramme.
+
+Mangler knappebildene, brukes de vanlige knappene. `-av` og `-pynt`-variantene
+er lagt ved, men brukes ikke ennå.
 
 ---
 

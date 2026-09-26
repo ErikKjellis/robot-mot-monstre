@@ -8,3 +8,6 @@ art/original/
 
 # delark fra bilde-AI-en - store filer, trengs ikke i repoet
 ark/*.png
+
+# oversiktsbilder som verktoeyene lager for aa sjekke resultatet
+art/font/*-oversikt.png
